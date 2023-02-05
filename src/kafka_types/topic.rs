@@ -12,7 +12,7 @@ impl From<&MetadataTopic> for Topic {
     fn from(t: &MetadataTopic) -> Self {
         Topic {
             name: t.name().to_owned(),
-            partitions: t.partitions().iter().map(|p| Partition::from(p)).collect(),
+            partitions: t.partitions().iter().map(Partition::from).collect(),
         }
     }
 }

@@ -1,19 +1,13 @@
 use std::time::Duration;
+
+use rdkafka::{admin::AdminClient, client::DefaultClientContext, util::Timeout, ClientConfig};
 use tokio::{
     sync::{broadcast, mpsc},
     task::JoinHandle,
     time,
 };
 
-use rdkafka::admin::AdminClient;
-use rdkafka::client::DefaultClientContext;
-use rdkafka::config::RDKafkaLogLevel;
-use rdkafka::metadata::{MetadataBroker, MetadataTopic};
-use rdkafka::util::Timeout;
-use rdkafka::ClientConfig;
-
-use crate::kafka_types::Broker;
-use crate::kafka_types::Topic;
+use crate::kafka_types::{Broker, Topic};
 
 pub struct ClusterMetaEmitter {
     admin_client_config: ClientConfig,
@@ -32,10 +26,7 @@ impl ClusterMetaEmitter {
         }
     }
 
-    pub fn spawn(
-        &self,
-        mut shutdown_rx: broadcast::Receiver<()>,
-    ) -> (mpsc::Receiver<ClusterMeta>, JoinHandle<()>) {
+    pub fn spawn(&self, mut shutdown_rx: broadcast::Receiver<()>) -> (mpsc::Receiver<ClusterMeta>, JoinHandle<()>) {
         let admin_client: AdminClient<DefaultClientContext> = self.admin_client_config.create().expect("TODO");
 
         let (tx, rx) = mpsc::channel::<ClusterMeta>(1);
@@ -48,8 +39,8 @@ impl ClusterMetaEmitter {
                 let metadata = admin_client.inner().fetch_metadata(None, Timeout::Never).expect("TODO");
 
                 let latest_cluster_meta = ClusterMeta {
-                    topics: metadata.topics().iter().map(|t| Topic::from(t)).collect(),
-                    brokers: metadata.brokers().iter().map(|b| Broker::from(b)).collect(),
+                    topics: metadata.topics().iter().map(Topic::from).collect(),
+                    brokers: metadata.brokers().iter().map(Broker::from).collect(),
                 };
 
                 tokio::select! {
@@ -76,10 +67,10 @@ impl ClusterMetaEmitter {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use std::any::Any;
-
-    #[test]
-    fn test_none() {}
-}
+// #[cfg(test)]
+// mod tests {
+//     use std::any::Any;
+//
+//     #[test]
+//     fn test_none() {}
+// }

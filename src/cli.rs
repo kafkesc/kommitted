@@ -1,10 +1,10 @@
-use chrono::{FixedOffset, Local, Offset, TimeZone, Utc};
-use chrono_tz::{ParseError, Tz};
-use clap::{error::ErrorKind, value_parser, ArgGroup, CommandFactory, Parser};
-use regex::{Captures, Regex, RegexSet};
-use std::num::ParseIntError;
 use std::str::FromStr;
+
+use chrono::{FixedOffset, Local, Offset, TimeZone, Utc};
+use chrono_tz::Tz;
+use clap::{ArgGroup, Parser};
 use rdkafka::ClientConfig;
+use regex::{Captures, Regex, RegexSet};
 
 // Follows the list of arguments we need to start with:
 //
@@ -109,11 +109,8 @@ pub struct Cli {
 
 impl Cli {
     pub fn parse_and_validate() -> Self {
-        let cli = Self::parse();
-
-        // TODO
-
-        cli
+        // TODO Implement a proper validation
+        Self::parse()
     }
 
     pub fn verbosity_level(&self) -> i8 {
@@ -122,9 +119,7 @@ impl Cli {
 
     pub fn build_client_config(&self) -> ClientConfig {
         let mut config = ClientConfig::new();
-        config
-            .set("bootstrap.servers", self.bootstrap_brokers.clone())
-            .set("client.id", self.client_id.clone());
+        config.set("bootstrap.servers", self.bootstrap_brokers.clone()).set("client.id", self.client_id.clone());
         for cfg in &self.config {
             config.set(cfg.0.clone(), cfg.1.clone());
         }
@@ -151,7 +146,7 @@ fn kv_clap_value_parser(kv: &str) -> Result<KVPair, String> {
 
 fn fixed_offset_clap_value_parser(arg_tz: &str) -> Result<FixedOffset, String> {
     // Prepare set of supported format regexes
-    let regex_set = RegexSet::new(&[
+    let regex_set = RegexSet::new([
         r"^\w+/\w+$",
         r"^\w+$",
         r"^(?P<sign>[+\-])(?P<hours>\d{2}):(?P<minutes>\d{2}):(?P<seconds>\d{2})$",
@@ -167,11 +162,7 @@ fn fixed_offset_clap_value_parser(arg_tz: &str) -> Result<FixedOffset, String> {
     return if matches.matched(0) || matches.matched(1) {
         // Case 0: IANA named Timezone
 
-        Ok(arg_tz
-            .parse::<Tz>()
-            .map_err(|e: ParseError| e.to_string())?
-            .offset_from_utc_datetime(&Utc::now().naive_utc())
-            .fix())
+        Ok(arg_tz.parse::<Tz>()?.offset_from_utc_datetime(&Utc::now().naive_utc()).fix())
     } else if matches.matched(2) {
         // Case 1: Offset Timezone expressed as '±hh:mm:ss'
 

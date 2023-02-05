@@ -1,18 +1,17 @@
 #[macro_use]
 extern crate log;
 
-use std::error::Error;
-
-use tokio::sync::broadcast;
-use tokio::sync::mpsc;
-
-use crate::cli::Cli;
-use crate::cluster_meta_emitter::ClusterMetaEmitter;
-
 mod cli;
 mod cluster_meta_emitter;
 mod kafka_types;
 mod logging;
+
+use std::error::Error;
+
+use tokio::sync::broadcast;
+
+use cli::Cli;
+use cluster_meta_emitter::ClusterMetaEmitter;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -25,7 +24,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let (mut cluster_meta_rx, cluster_meta_emitter_handle) = cluster_meta_emitter.spawn(shutdown_rx);
     let receiver_handle = tokio::spawn(async move {
         while let Some(cluster_meta) = cluster_meta_rx.recv().await {
-            println!("{:#?}", cluster_meta);
+            println!("{cluster_meta:#?}");
         }
     });
 
