@@ -21,14 +21,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let cluster_meta_emitter = ClusterMetaEmitter::new(cli.build_client_config());
 
-    let (mut cluster_meta_rx, cluster_meta_emitter_handle) = cluster_meta_emitter.spawn(shutdown_rx);
+    let (mut cluster_meta_rx, _) = cluster_meta_emitter.spawn(shutdown_rx);
+
     let receiver_handle = tokio::spawn(async move {
         while let Some(cluster_meta) = cluster_meta_rx.recv().await {
             println!("{cluster_meta:#?}");
         }
     });
-
-    cluster_meta_emitter_handle.await?;
     receiver_handle.await?;
 
     Ok(())
