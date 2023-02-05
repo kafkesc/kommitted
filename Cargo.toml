@@ -1,0 +1,34 @@
+[package]
+name = "kcl"
+version = "0.1.0"
+edition = "2021"
+authors = ["Ivan De Marino <detronizator@gmail.com>", "Kafkesc <https://github.com/kafkesc>"]
+repository = "https://github.com/kafkesc/ksunami"
+homepage = "https://github.com/kafkesc/ksunami"
+description = "TODO"
+license = "MIT OR Apache-2.0"
+keywords = ["kafka", "consume", "lag", "monitoring", "performance"]
+categories = ["TODO"]
+exclude = [
+    ".github/",
+    ".gitignore",
+]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+chrono = "0.4.23"
+chrono-tz = "0.8.1"
+clap = { version = "4.1.4", features = ["derive", "deprecated", "env", "wrap_help"] }
+ctrlc = { version = "3.2.5", features = ["termination"] }
+env_logger = "0.10.0"
+log = "0.4.17"
+regex = "1.7.1"
+tokio = { version = "1.25.0", features = ["rt", "rt-multi-thread", "time", "sync", "macros"] }
+
+[target.'cfg(unix)'.dependencies]
+rdkafka = { version = "0.29.0", features = ["ssl-vendored", "gssapi-vendored", "libz-static"] }
+
+[profile.release]
+strip = true # Automatically strip symbols from the binary.
+lto = true   # Link time optimization - see https://llvm.org/docs/LinkTimeOptimization.html.
