@@ -2,7 +2,7 @@
 extern crate log;
 
 mod cli;
-mod cluster_meta_emitter;
+mod cluster_status_emitter;
 mod kafka_types;
 mod logging;
 
@@ -11,7 +11,7 @@ use std::error::Error;
 use tokio::sync::broadcast;
 
 use cli::Cli;
-use cluster_meta_emitter::ClusterMetaEmitter;
+use cluster_status_emitter::ClusterStatusEmitter;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -19,7 +19,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let shutdown_rx = build_shutdown_channel();
 
-    let cluster_meta_emitter = ClusterMetaEmitter::new(cli.build_client_config());
+    let cluster_meta_emitter = ClusterStatusEmitter::new(cli.build_client_config());
 
     let (mut cluster_meta_rx, _) = cluster_meta_emitter.spawn(shutdown_rx);
 
