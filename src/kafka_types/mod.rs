@@ -1,7 +1,5 @@
 mod broker;
-mod partition;
-mod topic;
+mod topic_partitions_status;
 
 pub use broker::Broker;
-pub use partition::Partition;
-pub use topic::Topic;
+pub use topic_partitions_status::{PartitionStatus, TopicPartitionsStatus};
