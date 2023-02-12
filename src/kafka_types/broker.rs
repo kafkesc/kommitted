@@ -1,6 +1,6 @@
 use rdkafka::metadata::MetadataBroker;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct Broker {
     pub id: u32,
     pub host: String,
