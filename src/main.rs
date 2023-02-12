@@ -4,6 +4,7 @@ extern crate log;
 mod cli;
 mod cluster_status_emitter;
 mod kafka_types;
+mod internals;
 mod logging;
 
 use std::error::Error;
@@ -12,6 +13,7 @@ use tokio::sync::broadcast;
 
 use cli::Cli;
 use cluster_status_emitter::ClusterStatusEmitter;
+use internals::Emitter;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -25,7 +27,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let receiver_handle = tokio::spawn(async move {
         while let Some(cluster_meta) = cluster_meta_rx.recv().await {
-            println!("{cluster_meta:#?}");
+            println!("{cluster_meta:?}");
         }
     });
     receiver_handle.await?;

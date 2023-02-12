@@ -7,13 +7,14 @@ use tokio::{
     time,
 };
 
+use crate::internals::Emitter;
 use crate::kafka_types::{Broker, TopicPartitionsStatus};
 
 const CHANNEL_SIZE: usize = 1;
 const CHANNEL_SEND_TIMEOUT: Duration = Duration::from_millis(100);
 
 const METADATA_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
-const METADATA_FETCH_INTERVAL: Duration = Duration::from_secs(10);
+const METADATA_FETCH_INTERVAL: Duration = Duration::from_secs(30);
 
 /// Emits [`ClusterStatus`] via a provided [`mpsc::channel`].
 ///
@@ -31,7 +32,7 @@ pub struct ClusterStatus {
     /// A vector of [`TopicPartitionsStatus`].
     ///
     /// For each topic it describes where each partition is, which broker leads it,
-    /// and which follower brokers are in sync.
+    /// what are the begin and end offsets and which follower brokers are in sync.
     pub topics: Vec<TopicPartitionsStatus>,
 
     /// A vector of [`Broker`].
@@ -46,14 +47,22 @@ impl ClusterStatusEmitter {
             admin_client_config: client_config,
         }
     }
+}
+
+impl Emitter for ClusterStatusEmitter {
+    type Emitted = ClusterStatus;
 
     /// Spawn a new async task to run the business logic of this struct.
+    ///
+    /// When this emitter gets spawned, it returns a [`broadcast::Receiver`] for [`ClusterStatus`],
+    /// and a [`JoinHandle`] to help join on the task spawned internally.
+    /// The task concludes (joins) only ones the inner task of the emitter terminates.
     ///
     /// # Arguments
     ///
     /// * `shutdown_rx`: A [`broadcast::Receiver`] to request the internal async task to shutdown.
     ///
-    pub fn spawn(&self, mut shutdown_rx: broadcast::Receiver<()>) -> (mpsc::Receiver<ClusterStatus>, JoinHandle<()>) {
+    fn spawn(&self, mut shutdown_rx: broadcast::Receiver<()>) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
         let admin_client: AdminClient<DefaultClientContext> =
             self.admin_client_config.create().expect("Failed to allocate Admin Client");
 
@@ -65,11 +74,42 @@ impl ClusterStatusEmitter {
             loop {
                 match admin_client.inner().fetch_metadata(None, METADATA_FETCH_TIMEOUT) {
                     Ok(m) => {
-                        // NOTE: ClusterMeta is Send
+                        // NOTE: Turn metadata into our `Send`-able type
                         let status = ClusterStatus {
-                            topics: m.topics().iter().map(TopicPartitionsStatus::from).collect(),
+                            topics: m
+                                .topics()
+                                .iter()
+                                .map(|t| {
+                                    let mut tps = TopicPartitionsStatus::from(t);
+
+                                    // For each `PartitionStatus`, look up the begin/end offset watermarks
+                                    for mut ps in &mut tps.partitions {
+                                        match admin_client.inner().fetch_watermarks(
+                                            tps.name.as_str(),
+                                            ps.id as i32,
+                                            METADATA_FETCH_TIMEOUT,
+                                        ) {
+                                            Ok((b, e)) => {
+                                                // Update specific partition status with the fetched watermarks
+                                                ps.begin_offset = b as u64;
+                                                ps.end_offset = e as u64;
+                                            },
+                                            Err(e) => {
+                                                error!("Failed to fetch being/end watermarks for '{}:{}': {e}", tps.name, ps.id)
+                                            },
+                                        }
+                                    }
+
+                                    tps
+                                })
+                                .collect(),
                             brokers: m.brokers().iter().map(Broker::from).collect(),
                         };
+
+                        let ch_cap = sx.capacity();
+                        if ch_cap == 0 {
+                            warn!("Emitting channel saturated: receiver too slow?");
+                        }
 
                         tokio::select! {
                             // Send the latest `ClusterStatus`
