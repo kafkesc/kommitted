@@ -1,5 +1,9 @@
 use rdkafka::metadata::MetadataBroker;
 
+/// A Brokers that is part of a Kafka cluster.
+///
+/// It is identified by a unique identifier for the given Cluster,
+/// and the host and port to connect to it.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct Broker {
     pub id: u32,
