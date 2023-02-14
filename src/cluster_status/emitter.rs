@@ -31,13 +31,12 @@ pub struct ClusterStatusEmitter {
 pub struct ClusterStatus {
     /// A vector of [`TopicPartitionsStatus`].
     ///
-    /// For each topic it describes where each partition is, which broker leads it,
-    /// what are the begin and end offsets and which follower brokers are in sync.
+    /// It reflects the status of Topics (and Partitions) as reported by the Kafka cluster.
     pub topics: Vec<TopicPartitionsStatus>,
 
     /// A vector of [`Broker`].
     ///
-    /// Brokers that are part of the Cluster, ID, host and port.
+    /// It reflects the status of Brokers as reported by the Kafka cluster.
     pub brokers: Vec<Broker>,
 }
 
@@ -76,33 +75,7 @@ impl Emitter for ClusterStatusEmitter {
                     Ok(m) => {
                         // NOTE: Turn metadata into our `Send`-able type
                         let status = ClusterStatus {
-                            topics: m
-                                .topics()
-                                .iter()
-                                .map(|t| {
-                                    let mut tps = TopicPartitionsStatus::from(t);
-
-                                    // For each `PartitionStatus`, look up the begin/end offset watermarks
-                                    for mut ps in &mut tps.partitions {
-                                        match admin_client.inner().fetch_watermarks(
-                                            tps.name.as_str(),
-                                            ps.id as i32,
-                                            METADATA_FETCH_TIMEOUT,
-                                        ) {
-                                            Ok((b, e)) => {
-                                                // Update specific partition status with the fetched watermarks
-                                                ps.begin_offset = b as u64;
-                                                ps.end_offset = e as u64;
-                                            },
-                                            Err(e) => {
-                                                error!("Failed to fetch being/end watermarks for '{}:{}': {e}", tps.name, ps.id)
-                                            },
-                                        }
-                                    }
-
-                                    tps
-                                })
-                                .collect(),
+                            topics: m.topics().iter().map(TopicPartitionsStatus::from).collect(),
                             brokers: m.brokers().iter().map(Broker::from).collect(),
                         };
 

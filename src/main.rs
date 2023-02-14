@@ -2,17 +2,17 @@
 extern crate log;
 
 mod cli;
-mod cluster_status_emitter;
 mod kafka_types;
 mod internals;
 mod logging;
+mod cluster_status;
 
 use std::error::Error;
 
 use tokio::sync::broadcast;
 
 use cli::Cli;
-use cluster_status_emitter::ClusterStatusEmitter;
+use cluster_status::ClusterStatusEmitter;
 use internals::Emitter;
 
 #[tokio::main]
