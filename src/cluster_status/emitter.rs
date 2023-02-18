@@ -1,10 +1,8 @@
-use std::time::Duration;
-
 use rdkafka::{admin::AdminClient, client::DefaultClientContext, ClientConfig};
 use tokio::{
     sync::{broadcast, mpsc},
     task::JoinHandle,
-    time,
+    time::{interval, Duration},
 };
 
 use crate::internals::Emitter;
@@ -41,9 +39,9 @@ pub struct ClusterStatusEmitter {
 }
 
 impl ClusterStatusEmitter {
-    pub fn new(client_config: ClientConfig) -> ClusterStatusEmitter {
+    pub fn new(admin_client_config: ClientConfig) -> ClusterStatusEmitter {
         ClusterStatusEmitter {
-            admin_client_config: client_config,
+            admin_client_config,
         }
     }
 }
@@ -61,22 +59,38 @@ impl Emitter for ClusterStatusEmitter {
     ///
     /// * `shutdown_rx`: A [`broadcast::Receiver`] to request the internal async task to shutdown.
     ///
-    fn spawn(&self, mut shutdown_rx: broadcast::Receiver<()>) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
-        let admin_client: AdminClient<DefaultClientContext> =
-            self.admin_client_config.create().expect("Failed to allocate Admin Client");
+    fn spawn(
+        &self,
+        mut shutdown_rx: broadcast::Receiver<()>,
+    ) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
+        let admin_client: AdminClient<DefaultClientContext> = self
+            .admin_client_config
+            .create()
+            .expect("Failed to allocate Admin Client");
 
         let (sx, rx) = mpsc::channel::<ClusterStatus>(CHANNEL_SIZE);
 
         let join_handle = tokio::spawn(async move {
-            let mut interval = time::interval(METADATA_FETCH_INTERVAL);
+            let mut interval = interval(METADATA_FETCH_INTERVAL);
 
-            loop {
-                match admin_client.inner().fetch_metadata(None, METADATA_FETCH_TIMEOUT) {
+            'outer: loop {
+                match admin_client
+                    .inner()
+                    .fetch_metadata(None, METADATA_FETCH_TIMEOUT)
+                {
                     Ok(m) => {
                         // NOTE: Turn metadata into our `Send`-able type
                         let status = ClusterStatus {
-                            topics: m.topics().iter().map(TopicPartitionsStatus::from).collect(),
-                            brokers: m.brokers().iter().map(Broker::from).collect(),
+                            topics: m
+                                .topics()
+                                .iter()
+                                .map(TopicPartitionsStatus::from)
+                                .collect(),
+                            brokers: m
+                                .brokers()
+                                .iter()
+                                .map(Broker::from)
+                                .collect(),
                         };
 
                         let ch_cap = sx.capacity();
@@ -97,7 +111,7 @@ impl Emitter for ClusterStatusEmitter {
                             // on the sender end, and conclude its own activity/task.
                             _ = shutdown_rx.recv() => {
                                 info!("Received shutdown signal");
-                                break;
+                                break 'outer;
                             },
                         }
                     },

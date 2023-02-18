@@ -12,7 +12,10 @@ use tokio::{
 pub trait BroadcastEmitter {
     type Emitted: Send;
 
-    fn spawn(&self, shutdown_rx: broadcast::Receiver<()>) -> (broadcast::Receiver<Self::Emitted>, JoinHandle<()>);
+    fn spawn(
+        &self,
+        shutdown_rx: broadcast::Receiver<()>,
+    ) -> (broadcast::Receiver<Self::Emitted>, JoinHandle<()>);
 }
 
 /// Type that emits an [`Send`]-able object via a [`mpsc::Receiver`].
@@ -24,5 +27,8 @@ pub trait BroadcastEmitter {
 pub trait Emitter {
     type Emitted: Send;
 
-    fn spawn(&self, shutdown_rx: broadcast::Receiver<()>) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>);
+    fn spawn(
+        &self,
+        shutdown_rx: broadcast::Receiver<()>,
+    ) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>);
 }

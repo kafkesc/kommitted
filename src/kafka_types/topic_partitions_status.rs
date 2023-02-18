@@ -1,6 +1,5 @@
 use rdkafka::metadata::{MetadataPartition, MetadataTopic};
 
-
 /// For a given Topic, it describes its status as reported by the Kafka cluster.
 ///
 /// In details, it describes where each partition is, which broker leads each partition,
@@ -15,7 +14,11 @@ impl From<&MetadataTopic> for TopicPartitionsStatus {
     fn from(t: &MetadataTopic) -> Self {
         TopicPartitionsStatus {
             name: t.name().to_owned(),
-            partitions: t.partitions().iter().map(PartitionStatus::from).collect(),
+            partitions: t
+                .partitions()
+                .iter()
+                .map(PartitionStatus::from)
+                .collect(),
         }
     }
 }
@@ -36,8 +39,16 @@ impl From<&MetadataPartition> for PartitionStatus {
         PartitionStatus {
             id: p.id() as u32,
             leader_broker: p.leader() as u32,
-            replica_brokers: p.replicas().iter().map(|r| r.to_owned() as u32).collect(),
-            in_sync_replica_brokers: p.isr().iter().map(|isr| isr.to_owned() as u32).collect(),
+            replica_brokers: p
+                .replicas()
+                .iter()
+                .map(|r| r.to_owned() as u32)
+                .collect(),
+            in_sync_replica_brokers: p
+                .isr()
+                .iter()
+                .map(|isr| isr.to_owned() as u32)
+                .collect(),
         }
     }
 }

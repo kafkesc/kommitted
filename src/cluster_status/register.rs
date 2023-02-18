@@ -1,6 +1,6 @@
 use std::sync::Arc;
-use tokio::sync::mpsc::Receiver;
-use tokio::sync::RwLock;
+
+use tokio::sync::{mpsc::Receiver, RwLock};
 
 use crate::cluster_status::ClusterStatus;
 use crate::internals::Register;
@@ -36,6 +36,7 @@ impl Register for ClusterStatusRegister {
         tokio::spawn(async move {
             while let Some(cs) = rx.recv().await {
                 *(latest_status_arc_clone.write().await) = Some(cs);
+                trace!("Updated cluster status");
             }
         });
 
@@ -56,7 +57,11 @@ impl ClusterStatusRegister {
     pub async fn get_topic_partitions(&self, topic: &str) -> Option<Vec<u32>> {
         match &*(self.latest_status.read().await) {
             None => None,
-            Some(cs) => cs.topics.iter().find(|t| t.name == topic).map(|t| t.partitions.iter().map(|p| p.id).collect()),
+            Some(cs) => cs
+                .topics
+                .iter()
+                .find(|t| t.name == topic)
+                .map(|t| t.partitions.iter().map(|p| p.id).collect()),
         }
     }
 

@@ -119,7 +119,9 @@ impl Cli {
 
     pub fn build_client_config(&self) -> ClientConfig {
         let mut config = ClientConfig::new();
-        config.set("bootstrap.servers", self.bootstrap_brokers.clone()).set("client.id", self.client_id.clone());
+        config
+            .set("bootstrap.servers", self.bootstrap_brokers.clone())
+            .set("client.id", self.client_id.clone());
         for cfg in &self.config {
             config.set(cfg.0.clone(), cfg.1.clone());
         }
@@ -154,7 +156,11 @@ fn fixed_offset_clap_value_parser(arg_tz: &str) -> Result<FixedOffset, String> {
     ])
     .unwrap();
     // Compile each regex by itself as well, so they can be used for capturing
-    let regexes: Vec<Regex> = regex_set.patterns().iter().map(|pattern| Regex::new(pattern).unwrap()).collect();
+    let regexes: Vec<Regex> = regex_set
+        .patterns()
+        .iter()
+        .map(|pattern| Regex::new(pattern).unwrap())
+        .collect();
 
     // Check which regex matches
     let matches = regex_set.matches(arg_tz);
@@ -162,11 +168,16 @@ fn fixed_offset_clap_value_parser(arg_tz: &str) -> Result<FixedOffset, String> {
     return if matches.matched(0) || matches.matched(1) {
         // Case 0: IANA named Timezone
 
-        Ok(arg_tz.parse::<Tz>()?.offset_from_utc_datetime(&Utc::now().naive_utc()).fix())
+        Ok(arg_tz
+            .parse::<Tz>()?
+            .offset_from_utc_datetime(&Utc::now().naive_utc())
+            .fix())
     } else if matches.matched(2) {
         // Case 1: Offset Timezone expressed as '±hh:mm:ss'
 
-        let caps = regexes[2].captures(arg_tz).ok_or(format!("Failed to parse Timezone Offset: '{arg_tz}'"))?;
+        let caps = regexes[2]
+            .captures(arg_tz)
+            .ok_or(format!("Failed to parse Timezone Offset: '{arg_tz}'"))?;
 
         let east = caps.name("sign").unwrap().as_str() == "+";
         let hours = cap_val::<i32>(&caps, "hours")?;
@@ -175,14 +186,18 @@ fn fixed_offset_clap_value_parser(arg_tz: &str) -> Result<FixedOffset, String> {
 
         let seconds = hours * 3600 + minutes * 60 + seconds;
         if east {
-            Ok(FixedOffset::east_opt(seconds).ok_or(format!("Out-of-bound Timezone Offset: '{arg_tz}'"))?)
+            Ok(FixedOffset::east_opt(seconds)
+                .ok_or(format!("Out-of-bound Timezone Offset: '{arg_tz}'"))?)
         } else {
-            Ok(FixedOffset::west_opt(seconds).ok_or(format!("Out-of-bound Timezone Offset: '{arg_tz}'"))?)
+            Ok(FixedOffset::west_opt(seconds)
+                .ok_or(format!("Out-of-bound Timezone Offset: '{arg_tz}'"))?)
         }
     } else if matches.matched(3) {
         // Case 2: Offset Timezone expressed as '±hh:mm'
 
-        let caps = regexes[3].captures(arg_tz).ok_or(format!("Failed to parse Timezone Offset: '{arg_tz}'"))?;
+        let caps = regexes[3]
+            .captures(arg_tz)
+            .ok_or(format!("Failed to parse Timezone Offset: '{arg_tz}'"))?;
 
         let east = caps.name("sign").unwrap().as_str() == "+";
         let hours = cap_val::<i32>(&caps, "hours")?;
@@ -190,9 +205,11 @@ fn fixed_offset_clap_value_parser(arg_tz: &str) -> Result<FixedOffset, String> {
 
         let seconds = hours * 3600 + minutes * 60;
         if east {
-            Ok(FixedOffset::east_opt(seconds).ok_or(format!("Out-of-bound Timezone Offset: '{arg_tz}'"))?)
+            Ok(FixedOffset::east_opt(seconds)
+                .ok_or(format!("Out-of-bound Timezone Offset: '{arg_tz}'"))?)
         } else {
-            Ok(FixedOffset::west_opt(seconds).ok_or(format!("Out-of-bound Timezone Offset: '{arg_tz}'"))?)
+            Ok(FixedOffset::west_opt(seconds)
+                .ok_or(format!("Out-of-bound Timezone Offset: '{arg_tz}'"))?)
         }
     } else {
         Err(format!(
@@ -206,5 +223,9 @@ where
     T: FromStr,
     T::Err: ToString,
 {
-    caps.name(cap_group).unwrap().as_str().parse::<T>().map_err(|e| e.to_string())
+    caps.name(cap_group)
+        .unwrap()
+        .as_str()
+        .parse::<T>()
+        .map_err(|e| e.to_string())
 }

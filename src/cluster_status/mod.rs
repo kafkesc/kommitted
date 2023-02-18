@@ -1,5 +1,5 @@
 mod emitter;
 mod register;
 
-pub use emitter::{ClusterStatusEmitter, ClusterStatus};
+pub use emitter::{ClusterStatus, ClusterStatusEmitter};
 pub use register::ClusterStatusRegister;
