@@ -6,42 +6,49 @@ mod cluster_status;
 mod internals;
 mod kafka_types;
 mod logging;
+mod partition_offsets;
 
 use std::error::Error;
-use std::time::Duration;
+use std::sync::Arc;
 
-use tokio::{sync::broadcast, time};
+use tokio::sync::broadcast;
 
+use crate::cluster_status::ClusterStatusRegister;
+use crate::partition_offsets::PartitionOffsetsEmitter;
 use cli::Cli;
 use cluster_status::ClusterStatusEmitter;
 use internals::{Emitter, Register};
-use crate::cluster_status::ClusterStatusRegister;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = parse_cli_and_init_logging();
+    let admin_client_config = cli.build_client_config();
 
     let shutdown_rx = build_shutdown_channel();
 
-    let (cluster_meta_rx, _) = ClusterStatusEmitter::new(cli.build_client_config()).spawn(shutdown_rx);
-    let cluster_status_reg = ClusterStatusRegister::new(cluster_meta_rx);
+    // Cluster Status: emitter and register
+    let (cs_rx, cse_join) =
+        ClusterStatusEmitter::new(admin_client_config.clone())
+            .spawn(shutdown_rx.resubscribe());
+    let cs_reg = ClusterStatusRegister::new(cs_rx);
 
-    let mut interval = time::interval(Duration::from_secs(2));
-    loop {
-        println!("Topics: {:?}", cluster_status_reg.get_topics().await);
-        println!("Brokers: {:?}", cluster_status_reg.get_brokers().await);
+    // Partition Offsets: emitter
+    let (mut po_rx, poe_join) = PartitionOffsetsEmitter::new(
+        admin_client_config.clone(),
+        Arc::new(cs_reg),
+    )
+    .spawn(shutdown_rx.resubscribe());
 
-        interval.tick().await;
-    }
+    // WIP: echo
+    let echo_join = tokio::spawn(async move {
+        while let Some(po) = po_rx.recv().await {
+            info!("{po:?}");
+        }
+    });
 
-    // let receiver_handle = tokio::spawn(async move {
-    //     while let Some(cluster_meta) = cluster_meta_rx.recv().await {
-    //         println!("{cluster_meta:?}");
-    //     }
-    // });
-    // receiver_handle.await?;
-
-    // Ok(())
+    // Join all the async tasks, then let it terminate
+    let _ = tokio::join!(cse_join, poe_join, echo_join);
+    Ok(())
 }
 
 fn parse_cli_and_init_logging() -> Cli {
