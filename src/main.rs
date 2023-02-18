@@ -2,18 +2,20 @@
 extern crate log;
 
 mod cli;
-mod kafka_types;
-mod internals;
-mod logging;
 mod cluster_status;
+mod internals;
+mod kafka_types;
+mod logging;
 
 use std::error::Error;
+use std::time::Duration;
 
-use tokio::sync::broadcast;
+use tokio::{sync::broadcast, time};
 
 use cli::Cli;
 use cluster_status::ClusterStatusEmitter;
-use internals::Emitter;
+use internals::{Emitter, Register};
+use crate::cluster_status::ClusterStatusRegister;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -21,18 +23,25 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let shutdown_rx = build_shutdown_channel();
 
-    let cluster_meta_emitter = ClusterStatusEmitter::new(cli.build_client_config());
+    let (cluster_meta_rx, _) = ClusterStatusEmitter::new(cli.build_client_config()).spawn(shutdown_rx);
+    let cluster_status_reg = ClusterStatusRegister::new(cluster_meta_rx);
 
-    let (mut cluster_meta_rx, _) = cluster_meta_emitter.spawn(shutdown_rx);
+    let mut interval = time::interval(Duration::from_secs(2));
+    loop {
+        println!("Topics: {:?}", cluster_status_reg.get_topics().await);
+        println!("Brokers: {:?}", cluster_status_reg.get_brokers().await);
 
-    let receiver_handle = tokio::spawn(async move {
-        while let Some(cluster_meta) = cluster_meta_rx.recv().await {
-            println!("{cluster_meta:?}");
-        }
-    });
-    receiver_handle.await?;
+        interval.tick().await;
+    }
 
-    Ok(())
+    // let receiver_handle = tokio::spawn(async move {
+    //     while let Some(cluster_meta) = cluster_meta_rx.recv().await {
+    //         println!("{cluster_meta:?}");
+    //     }
+    // });
+    // receiver_handle.await?;
+
+    // Ok(())
 }
 
 fn parse_cli_and_init_logging() -> Cli {

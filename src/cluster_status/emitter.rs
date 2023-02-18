@@ -16,18 +16,8 @@ const CHANNEL_SEND_TIMEOUT: Duration = Duration::from_millis(100);
 const METADATA_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 const METADATA_FETCH_INTERVAL: Duration = Duration::from_secs(30);
 
-/// Emits [`ClusterStatus`] via a provided [`mpsc::channel`].
-///
-/// It wraps an Admin Kafka Client, regularly requests it for the cluster metadata,
-/// and then emits it as [`ClusterStatus`].
-///
-/// It shuts down by sending a unit via a provided [`broadcast`].
-pub struct ClusterStatusEmitter {
-    admin_client_config: ClientConfig,
-}
-
 /// This is a `Send`-able struct to carry Kafka Cluster status across thread boundaries.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct ClusterStatus {
     /// A vector of [`TopicPartitionsStatus`].
     ///
@@ -38,6 +28,16 @@ pub struct ClusterStatus {
     ///
     /// It reflects the status of Brokers as reported by the Kafka cluster.
     pub brokers: Vec<Broker>,
+}
+
+/// Emits [`ClusterStatus`] via a provided [`mpsc::channel`].
+///
+/// It wraps an Admin Kafka Client, regularly requests it for the cluster metadata,
+/// and then emits it as [`ClusterStatus`].
+///
+/// It shuts down by sending a unit via a provided [`broadcast`].
+pub struct ClusterStatusEmitter {
+    admin_client_config: ClientConfig,
 }
 
 impl ClusterStatusEmitter {
