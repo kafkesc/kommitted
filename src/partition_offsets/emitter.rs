@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use chrono::{DateTime, FixedOffset, Local};
 
 use rdkafka::{admin::AdminClient, client::DefaultClientContext, ClientConfig};
 use tokio::{
@@ -22,21 +23,25 @@ pub struct PartitionOffsets {
     pub partition: u32,
     pub begin_offset: u64,
     pub end_offset: u64,
+    pub read_datetime: DateTime<FixedOffset>,
 }
 
 pub struct PartitionOffsetsEmitter {
     admin_client_config: ClientConfig,
     cluster_status_registry: Arc<ClusterStatusRegister>,
+    local_timezone: FixedOffset,
 }
 
 impl PartitionOffsetsEmitter {
     pub fn new(
         admin_client_config: ClientConfig,
         cluster_status_registry: Arc<ClusterStatusRegister>,
+        local_timezone: FixedOffset,
     ) -> PartitionOffsetsEmitter {
         PartitionOffsetsEmitter {
             admin_client_config,
             cluster_status_registry,
+            local_timezone,
         }
     }
 }
@@ -56,6 +61,7 @@ impl Emitter for PartitionOffsetsEmitter {
         let (sx, rx) = mpsc::channel::<PartitionOffsets>(CHANNEL_SIZE);
 
         let csr = self.cluster_status_registry.clone();
+        let tz = self.local_timezone;
         let join_handle = tokio::spawn(async move {
             let mut interval = interval(FETCH_INTERVAL);
 
@@ -77,6 +83,7 @@ impl Emitter for PartitionOffsetsEmitter {
                                     partition: p,
                                     begin_offset: b as u64,
                                     end_offset: e as u64,
+                                    read_datetime: DateTime::from_local(Local::now().naive_local(), tz),
                                 };
 
                                 tokio::select! {

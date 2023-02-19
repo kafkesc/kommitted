@@ -36,6 +36,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let (mut po_rx, poe_join) = PartitionOffsetsEmitter::new(
         admin_client_config.clone(),
         Arc::new(cs_reg),
+        cli.timezone,
     )
     .spawn(shutdown_rx.resubscribe());
 
