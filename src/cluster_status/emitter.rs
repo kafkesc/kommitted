@@ -9,10 +9,10 @@ use crate::internals::Emitter;
 use crate::kafka_types::{Broker, TopicPartitionsStatus};
 
 const CHANNEL_SIZE: usize = 1;
-const CHANNEL_SEND_TIMEOUT: Duration = Duration::from_millis(100);
+const SEND_TIMEOUT: Duration = Duration::from_millis(100);
 
-const METADATA_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
-const METADATA_FETCH_INTERVAL: Duration = Duration::from_secs(30);
+const FETCH_TIMEOUT: Duration = Duration::from_secs(5);
+const FETCH_INTERVAL: Duration = Duration::from_secs(10);
 
 /// This is a `Send`-able struct to carry Kafka Cluster status across thread boundaries.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
@@ -71,13 +71,10 @@ impl Emitter for ClusterStatusEmitter {
         let (sx, rx) = mpsc::channel::<ClusterStatus>(CHANNEL_SIZE);
 
         let join_handle = tokio::spawn(async move {
-            let mut interval = interval(METADATA_FETCH_INTERVAL);
+            let mut interval = interval(FETCH_INTERVAL);
 
             'outer: loop {
-                match admin_client
-                    .inner()
-                    .fetch_metadata(None, METADATA_FETCH_TIMEOUT)
-                {
+                match admin_client.inner().fetch_metadata(None, FETCH_TIMEOUT) {
                     Ok(m) => {
                         // NOTE: Turn metadata into our `Send`-able type
                         let status = ClusterStatus {
@@ -100,7 +97,7 @@ impl Emitter for ClusterStatusEmitter {
 
                         tokio::select! {
                             // Send the latest `ClusterStatus`
-                            res = sx.send_timeout(status, CHANNEL_SEND_TIMEOUT) => {
+                            res = sx.send_timeout(status, SEND_TIMEOUT) => {
                                 if let Err(e) = res {
                                     error!("Failed to emit cluster status: {e}");
                                 }
