@@ -44,26 +44,6 @@ pub struct Cli {
     )]
     pub config: Vec<KVPair>,
 
-    /// Timezone of the local system, compared to [UTC].
-    ///
-    /// This is used to interpret the wall-clock time.
-    ///
-    /// Defaults to the host system timezone, it supports the following format:
-    ///
-    /// * Timezone name compliant with [IANA Timezone DB] (e.g. "America/Los_Angeles")
-    /// * Offset from UTC, in the format "±hh:mm:ss" (e.g. "+04:00:00")
-    /// * Offset from UTC, in the format "±hh:mm" (e.g. "-08:00")
-    ///
-    /// [UTC]: https://en.wikipedia.org/wiki/Coordinated_Universal_Time
-    #[arg(long = "tz",
-        value_name = "TIMEZONE",
-        default_value_t = *(Local::now().offset()),
-        value_parser = fixed_offset_clap_value_parser,
-        allow_hyphen_values = true,
-        verbatim_doc_comment
-    )]
-    pub timezone: FixedOffset,
-
     /// Timezone of the Kafka Brokers, compared to [UTC].
     ///
     /// This is used to interpret the committed offsets timestamps read from the `__consumer_offsets` topic.
