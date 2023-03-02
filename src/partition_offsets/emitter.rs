@@ -1,5 +1,5 @@
+use chrono::{DateTime, Local, Utc};
 use std::sync::Arc;
-use chrono::{DateTime, FixedOffset, Local};
 
 use rdkafka::{admin::AdminClient, client::DefaultClientContext, ClientConfig};
 use tokio::{
@@ -15,7 +15,7 @@ const CHANNEL_SIZE: usize = 1;
 const SEND_TIMEOUT: Duration = Duration::from_millis(100);
 
 const FETCH_TIMEOUT: Duration = Duration::from_secs(1);
-const FETCH_INTERVAL: Duration = Duration::from_millis(500);
+const FETCH_INTERVAL: Duration = Duration::from_secs(1);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct PartitionOffsets {
@@ -23,25 +23,22 @@ pub struct PartitionOffsets {
     pub partition: u32,
     pub begin_offset: u64,
     pub end_offset: u64,
-    pub read_datetime: DateTime<FixedOffset>,
+    pub read_datetime: DateTime<Utc>,
 }
 
 pub struct PartitionOffsetsEmitter {
-    admin_client_config: ClientConfig,
-    cluster_status_registry: Arc<ClusterStatusRegister>,
-    local_timezone: FixedOffset,
+    client_config: ClientConfig,
+    cluster_register: Arc<ClusterStatusRegister>,
 }
 
 impl PartitionOffsetsEmitter {
     pub fn new(
-        admin_client_config: ClientConfig,
-        cluster_status_registry: Arc<ClusterStatusRegister>,
-        local_timezone: FixedOffset,
+        client_config: ClientConfig,
+        cluster_register: Arc<ClusterStatusRegister>,
     ) -> PartitionOffsetsEmitter {
         PartitionOffsetsEmitter {
-            admin_client_config,
-            cluster_status_registry,
-            local_timezone,
+            client_config,
+            cluster_register,
         }
     }
 }
@@ -54,14 +51,13 @@ impl Emitter for PartitionOffsetsEmitter {
         mut shutdown_rx: broadcast::Receiver<()>,
     ) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
         let admin_client: AdminClient<DefaultClientContext> = self
-            .admin_client_config
+            .client_config
             .create()
             .expect("Failed to allocate Admin Client");
 
         let (sx, rx) = mpsc::channel::<PartitionOffsets>(CHANNEL_SIZE);
 
-        let csr = self.cluster_status_registry.clone();
-        let tz = self.local_timezone;
+        let csr = self.cluster_register.clone();
         let join_handle = tokio::spawn(async move {
             let mut interval = interval(FETCH_INTERVAL);
 
@@ -83,7 +79,7 @@ impl Emitter for PartitionOffsetsEmitter {
                                     partition: p,
                                     begin_offset: b as u64,
                                     end_offset: e as u64,
-                                    read_datetime: DateTime::from_local(Local::now().naive_local(), tz),
+                                    read_datetime: Utc::now(),
                                 };
 
                                 tokio::select! {
