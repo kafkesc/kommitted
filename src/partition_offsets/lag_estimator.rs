@@ -131,9 +131,10 @@ impl PartitionLagEstimator {
             },
         };
 
-        // It's rare, but if we happen to receive a consumed offset datetime that is ahead
-        // of the estimated end offset datetime, we produce an error
-        if consumed_offset_datetime > estimated_produced_offset_datetime {
+        // It's rare, but if we happen to receive a consumed offset datetime that is behind
+        // of the estimated end offset datetime, we produce an error: it's simply not possible
+        // for an offset to be consumed before it's produced.
+        if consumed_offset_datetime < estimated_produced_offset_datetime {
             Err(PartitionOffsetsError::ConsumedAheadOfProducedOffsetDatetime(
                 consumed_offset_datetime,
                 estimated_produced_offset_datetime,
