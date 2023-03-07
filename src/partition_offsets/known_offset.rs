@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use std::cmp::Ordering;
 
 /// An Offset in a Topic Partition, and the date-time at which it is known.
 ///
@@ -31,7 +32,7 @@ pub enum KnownOffsetSearchRes {
 /// Otherwise, it returns [`KnownOffsetSearchRes::None`].
 pub fn search(needle: u64, haystack: &[KnownOffset]) -> KnownOffsetSearchRes {
     // Base case: empty
-    if haystack.len() == 0 {
+    if haystack.is_empty() {
         return KnownOffsetSearchRes::None;
     }
 
@@ -66,32 +67,36 @@ pub fn search(needle: u64, haystack: &[KnownOffset]) -> KnownOffsetSearchRes {
     let r: usize = haystack.len() - 1;
     let p = (r - l) / 2;
 
-    return if needle == haystack[p].offset {
-        // Found `needle`
-        KnownOffsetSearchRes::Exact(haystack[p].clone())
-    } else if needle < haystack[p].offset {
-        if haystack[p - 1].offset < needle {
-            // `needle` not found: return the approximate range `[p-1, p]`
-            KnownOffsetSearchRes::Range(
-                haystack[p - 1].clone(),
-                haystack[p].clone(),
-            )
-        } else {
-            // Keep searching to the left of pivot
-            search(needle, &haystack[0..=p - 1])
-        }
-    } else {
-        if needle < haystack[p + 1].offset {
-            // `needle` not found: return the approximate range `[p, p+1]`
-            KnownOffsetSearchRes::Range(
-                haystack[p].clone(),
-                haystack[p + 1].clone(),
-            )
-        } else {
-            // Keep searching to the right of pivot
-            search(needle, &haystack[p + 1..=r])
-        }
-    };
+    match needle.cmp(&haystack[p].offset) {
+        Ordering::Equal => {
+            // Found `needle`
+            KnownOffsetSearchRes::Exact(haystack[p].clone())
+        },
+        Ordering::Less => {
+            if haystack[p - 1].offset < needle {
+                // `needle` not found: return the approximate range `[p-1, p]`
+                KnownOffsetSearchRes::Range(
+                    haystack[p - 1].clone(),
+                    haystack[p].clone(),
+                )
+            } else {
+                // Keep searching to the left of pivot
+                search(needle, &haystack[0..=p - 1])
+            }
+        },
+        Ordering::Greater => {
+            if needle < haystack[p + 1].offset {
+                // `needle` not found: return the approximate range `[p, p+1]`
+                KnownOffsetSearchRes::Range(
+                    haystack[p].clone(),
+                    haystack[p + 1].clone(),
+                )
+            } else {
+                // Keep searching to the right of pivot
+                search(needle, &haystack[p + 1..=r])
+            }
+        },
+    }
 }
 
 #[cfg(test)]

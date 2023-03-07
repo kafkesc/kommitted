@@ -1,4 +1,4 @@
-use chrono::{DateTime, Local, Utc};
+use chrono::{DateTime, Utc};
 use std::sync::Arc;
 
 use rdkafka::{admin::AdminClient, client::DefaultClientContext, ClientConfig};

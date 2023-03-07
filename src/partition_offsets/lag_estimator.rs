@@ -124,8 +124,8 @@ impl PartitionLagEstimator {
                     .back()
                     .ok_or(PartitionOffsetsError::LagEstimatorNotReady)?;
                 interpolate_offset_to_datetime(
-                    &first_known,
-                    &last_known,
+                    first_known,
+                    last_known,
                     consumed_offset,
                 )?
             },
