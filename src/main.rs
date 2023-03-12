@@ -29,7 +29,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     );
 
     // Init `partition_offsets` module
-    let (po_reg, po_join) = partition_offsets::init(
+    let (_po_reg, po_join) = partition_offsets::init(
         admin_client_config.clone(),
         Arc::new(cs_reg),
         shutdown_rx.resubscribe(),

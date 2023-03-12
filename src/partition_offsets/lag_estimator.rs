@@ -40,6 +40,10 @@ impl PartitionLagEstimator {
         end_offset: u64,
         end_offset_datetime: DateTime<Utc>,
     ) {
+        // TODO Should discard adding datapoints for known offsets: this is because
+        //  a topic can stop receiving new messages, and we don't want to keep moving the
+        //  read date-time.
+
         // If we have no more capacity, drop the front instead of letting capacity grow
         if self.known.capacity() - self.known.len() == 0 {
             self.known.pop_front();
