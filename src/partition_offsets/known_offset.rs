@@ -30,6 +30,11 @@ pub enum KnownOffsetSearchRes {
 /// _not_ found _but_ the offsets in the haystack contain it, return the 2 closest
 /// [`KnownOffset`] in a [`KnownOffsetSearchRes::Range`].
 /// Otherwise, it returns [`KnownOffsetSearchRes::None`].
+///
+/// # Argument
+///
+/// * `needle` - Offset we are searching for
+/// * `haystack` - Slice of [`KnownOffset`] to search
 pub fn search(needle: u64, haystack: &[KnownOffset]) -> KnownOffsetSearchRes {
     // Base case: empty
     if haystack.is_empty() {

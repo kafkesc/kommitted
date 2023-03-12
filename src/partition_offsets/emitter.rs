@@ -17,12 +17,18 @@ const SEND_TIMEOUT: Duration = Duration::from_millis(100);
 const FETCH_TIMEOUT: Duration = Duration::from_secs(1);
 const FETCH_INTERVAL: Duration = Duration::from_secs(1);
 
+/// Offset information for a Topic Partition.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
-pub struct PartitionOffsets {
+pub struct PartitionOffset {
+    /// Topic of the Partition
     pub topic: String,
+    /// Partition
     pub partition: u32,
-    pub begin_offset: u64,
-    pub end_offset: u64,
+    /// Partition earliest available offset
+    pub earliest_offset: u64,
+    /// Partition latest available offset
+    pub latest_offset: u64,
+    /// [`DateTime<Utc>`] when this information was read from the Cluster
     pub read_datetime: DateTime<Utc>,
 }
 
@@ -32,6 +38,11 @@ pub struct PartitionOffsetsEmitter {
 }
 
 impl PartitionOffsetsEmitter {
+    /// Creates a new [`PartitionOffsetsEmitter`].
+    ///
+    /// # Arguments
+    ///
+    /// * `client_config` - Kafka admin client configuration, used to fetch the Topic Partitions offsets (earliest, latest)
     pub fn new(
         client_config: ClientConfig,
         cluster_register: Arc<ClusterStatusRegister>,
@@ -44,7 +55,7 @@ impl PartitionOffsetsEmitter {
 }
 
 impl Emitter for PartitionOffsetsEmitter {
-    type Emitted = PartitionOffsets;
+    type Emitted = PartitionOffset;
 
     fn spawn(
         &self,
@@ -55,7 +66,7 @@ impl Emitter for PartitionOffsetsEmitter {
             .create()
             .expect("Failed to allocate Admin Client");
 
-        let (sx, rx) = mpsc::channel::<PartitionOffsets>(CHANNEL_SIZE);
+        let (sx, rx) = mpsc::channel::<PartitionOffset>(CHANNEL_SIZE);
 
         let csr = self.cluster_register.clone();
         let join_handle = tokio::spawn(async move {
@@ -63,6 +74,8 @@ impl Emitter for PartitionOffsetsEmitter {
 
             'outer: loop {
                 for t in csr.get_topics().await {
+                    trace!("Fetching earlist/latest offset for Partitions of Topic '{}'", t);
+
                     for p in csr
                         .get_topic_partitions(t.as_str())
                         .await
@@ -73,12 +86,12 @@ impl Emitter for PartitionOffsetsEmitter {
                             p as i32,
                             FETCH_TIMEOUT,
                         ) {
-                            Ok((b, e)) => {
-                                let po = PartitionOffsets {
+                            Ok((earliest, latest)) => {
+                                let po = PartitionOffset {
                                     topic: t.clone(),
                                     partition: p,
-                                    begin_offset: b as u64,
-                                    end_offset: e as u64,
+                                    earliest_offset: earliest as u64,
+                                    latest_offset: latest as u64,
                                     read_datetime: Utc::now(),
                                 };
 

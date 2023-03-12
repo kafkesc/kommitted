@@ -1,7 +1,7 @@
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use std::collections::VecDeque;
 
-use super::errors::PartitionOffsetsError;
+use super::errors::{PartitionOffsetsError, PartitionOffsetsResult};
 use super::known_offset::KnownOffset;
 use super::known_offset::{search, KnownOffsetSearchRes};
 
@@ -67,7 +67,7 @@ impl PartitionLagEstimator {
     pub fn estimate_offset_lag(
         &self,
         consumed_offset: u64,
-    ) -> Result<u64, PartitionOffsetsError> {
+    ) -> PartitionOffsetsResult<u64> {
         let known_end_offset = self
             .known
             .back()
@@ -94,7 +94,7 @@ impl PartitionLagEstimator {
         &self,
         consumed_offset: u64,
         consumed_offset_datetime: DateTime<Utc>,
-    ) -> Result<Duration, PartitionOffsetsError> {
+    ) -> PartitionOffsetsResult<Duration> {
         // NOTE: Please look up `VecDequeue::make_contiguous()` that we call every time we update
         // the internal collection, for this to make sense.
         //
@@ -146,11 +146,19 @@ impl PartitionLagEstimator {
 }
 
 /// Interpolate [`KnownOffset`]s and Kafka Topic Partition offset, to get a [`DateTime<Utc>`].
+///
+/// The "cartesian plan" can imagined with _time_ on the _x-axis_, and _offset_ on the _y-axis_.
+///
+/// # Arguments
+///
+/// * `p1` - First point for the linear interpolation
+/// * `p2` - Second point for the linear interpolation
+/// * `y_offset` - The _y_ offset coordinate we want to find the _x_ [`DateTime<Utc>`] coordinate of.
 fn interpolate_offset_to_datetime(
     p1: &KnownOffset,
     p2: &KnownOffset,
     y_offset: u64,
-) -> Result<DateTime<Utc>, PartitionOffsetsError> {
+) -> PartitionOffsetsResult<DateTime<Utc>> {
     // Formula:
     //   y = m * x + c
 
@@ -175,9 +183,12 @@ fn interpolate_offset_to_datetime(
     utc_from_ms(x_timestamp.round() as i64)
 }
 
-fn utc_from_ms(
-    utc_timestamp_ms: i64,
-) -> Result<DateTime<Utc>, PartitionOffsetsError> {
+/// Create a [`DateTime<Utc>`] from an amount of milliseconds since UTC Epoch.
+///
+/// # Arguments
+///
+/// * `utc_timestamp_ms` - Amount of milliseconds since UTC Epoch.
+fn utc_from_ms(utc_timestamp_ms: i64) -> PartitionOffsetsResult<DateTime<Utc>> {
     Ok(DateTime::<Utc>::from_utc(
         NaiveDateTime::from_timestamp_millis(utc_timestamp_ms).ok_or(
             PartitionOffsetsError::UtcTimestampMillisInvalid(utc_timestamp_ms),
