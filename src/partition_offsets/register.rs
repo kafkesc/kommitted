@@ -52,6 +52,8 @@ impl Register for PartitionOffsetsRegister {
                         RwLock::new(PartitionLagEstimator::new(1000)),
                     );
                 }
+
+                trace!("Updating Partition: {:?}", k);
                 // Second, update the PartitionLagEstimator for this Key
                 guard
                     .downgrade() //< Here the exclusive write lock, becomes a read lock
