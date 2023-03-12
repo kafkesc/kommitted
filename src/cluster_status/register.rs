@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tokio::sync::{mpsc::Receiver, RwLock};
 
-use crate::cluster_status::ClusterStatus;
+use super::emitter::ClusterStatus;
 use crate::internals::Register;
 use crate::kafka_types::Broker;
 
@@ -19,7 +19,7 @@ impl Register for ClusterStatusRegister {
     type Registered = ClusterStatus;
 
     fn new(mut rx: Receiver<Self::Registered>) -> Self {
-        let csr = ClusterStatusRegister {
+        let csr = Self {
             latest_status: Arc::new(RwLock::new(None)),
         };
 
@@ -34,9 +34,21 @@ impl Register for ClusterStatusRegister {
         // that will happen when the `Receiver` `rx` receives `None`.
         // And, in turn, that will happen when the `Sender` part of the channel is dropped.
         tokio::spawn(async move {
+            debug!("Begin receiving ClusterStatus updates");
+
             while let Some(cs) = rx.recv().await {
+                trace!("Received:\n{:#?}", cs);
+
+                let t_len = cs.topics.len();
+                let b_len = cs.brokers.len();
+
                 *(latest_status_arc_clone.write().await) = Some(cs);
-                trace!("Updated cluster status");
+
+                debug!(
+                    "Updated cluster status: {} topics, {} brokers",
+                    t_len,
+                    b_len
+                );
             }
         });
 
@@ -54,6 +66,10 @@ impl ClusterStatusRegister {
     }
 
     /// Current Partitions for a Topic present in the Kafka cluster.
+    ///
+    /// # Arguments
+    ///
+    /// * `topic` - Topics we want to know the Partitions of.
     pub async fn get_topic_partitions(&self, topic: &str) -> Option<Vec<u32>> {
         match &*(self.latest_status.read().await) {
             None => None,
