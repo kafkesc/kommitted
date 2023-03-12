@@ -13,11 +13,7 @@ use std::sync::Arc;
 
 use tokio::sync::broadcast;
 
-use crate::cluster_status::ClusterStatusRegister;
-use crate::partition_offsets::PartitionOffsetsEmitter;
 use cli::Cli;
-use cluster_status::ClusterStatusEmitter;
-use internals::{Emitter, Register};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -26,28 +22,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let shutdown_rx = build_shutdown_channel();
 
-    // Cluster Status: emitter and register
-    let (cs_rx, cse_join) =
-        ClusterStatusEmitter::new(admin_client_config.clone())
-            .spawn(shutdown_rx.resubscribe());
-    let cs_reg = ClusterStatusRegister::new(cs_rx);
+    // Init `cluster_status` module
+    let (cs_reg, cs_join) = cluster_status::init(
+        admin_client_config.clone(),
+        shutdown_rx.resubscribe(),
+    );
 
-    // Partition Offsets: emitter
-    let (mut po_rx, poe_join) = PartitionOffsetsEmitter::new(
+    // Init `partition_offsets` module
+    let (po_reg, po_join) = partition_offsets::init(
         admin_client_config.clone(),
         Arc::new(cs_reg),
-    )
-    .spawn(shutdown_rx.resubscribe());
-
-    // WIP: echo
-    let echo_join = tokio::spawn(async move {
-        while let Some(po) = po_rx.recv().await {
-            info!("{po:?}");
-        }
-    });
+        shutdown_rx.resubscribe(),
+    );
 
     // Join all the async tasks, then let it terminate
-    let _ = tokio::join!(cse_join, poe_join, echo_join);
+    let _ = tokio::join!(cs_join, po_join);
     Ok(())
 }
 
