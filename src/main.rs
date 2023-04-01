@@ -3,6 +3,7 @@ extern crate log;
 
 mod cli;
 mod cluster_status;
+mod consumer_offsets;
 mod internals;
 mod kafka_types;
 mod logging;
@@ -31,6 +32,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Init `partition_offsets` module
     let (_po_reg, po_join) = partition_offsets::init(
         admin_client_config.clone(),
+        cli.offsets_history,
         Arc::new(cs_reg),
         shutdown_rx.resubscribe(),
     );

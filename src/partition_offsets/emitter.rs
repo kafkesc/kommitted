@@ -14,7 +14,7 @@ use crate::internals::Emitter;
 const CHANNEL_SIZE: usize = 1;
 const SEND_TIMEOUT: Duration = Duration::from_millis(100);
 
-const FETCH_TIMEOUT: Duration = Duration::from_secs(1);
+const FETCH_TIMEOUT: Duration = Duration::from_millis(100);
 const FETCH_INTERVAL: Duration = Duration::from_secs(1);
 
 /// Offset information for a Topic Partition.

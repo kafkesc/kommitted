@@ -18,10 +18,11 @@ use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 
 use crate::cluster_status::ClusterStatusRegister;
-use crate::internals::{Emitter, Register};
+use crate::internals::Emitter;
 
 pub fn init(
     admin_client_config: ClientConfig,
+    register_offsets_history: usize,
     cluster_status_register: Arc<ClusterStatusRegister>,
     shutdown_rx: broadcast::Receiver<()>,
 ) -> (PartitionOffsetsRegister, JoinHandle<()>) {
@@ -30,7 +31,7 @@ pub fn init(
         cluster_status_register,
     )
     .spawn(shutdown_rx);
-    let po_reg = PartitionOffsetsRegister::new(po_rx);
+    let po_reg = PartitionOffsetsRegister::new(po_rx, register_offsets_history);
 
     debug!("Initialized");
     (po_reg, poe_join)

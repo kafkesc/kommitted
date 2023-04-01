@@ -7,7 +7,6 @@ use tokio::sync::RwLock;
 use super::emitter::PartitionOffset;
 use super::errors::{PartitionOffsetsError, PartitionOffsetsResult};
 use super::lag_estimator::PartitionLagEstimator;
-use crate::internals::Register;
 
 /// (Topic, Partition)
 type Key = (String, u32);
@@ -20,10 +19,8 @@ pub struct PartitionOffsetsRegister {
     estimators: Arc<RwLock<HashMap<Key, Val>>>,
 }
 
-impl Register for PartitionOffsetsRegister {
-    type Registered = PartitionOffset;
-
-    fn new(mut rx: Receiver<Self::Registered>) -> Self {
+impl PartitionOffsetsRegister {
+    pub fn new(mut rx: Receiver<PartitionOffset>, offsets_history: usize) -> Self {
         let por = Self {
             estimators: Arc::new(RwLock::new(HashMap::new())),
         };
@@ -49,7 +46,7 @@ impl Register for PartitionOffsetsRegister {
                 if !guard.contains_key(&k) {
                     guard.insert(
                         k.clone(),
-                        RwLock::new(PartitionLagEstimator::new(1000)),
+                        RwLock::new(PartitionLagEstimator::new(offsets_history)),
                     );
                 }
 
