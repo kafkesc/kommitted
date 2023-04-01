@@ -79,6 +79,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d261e256854913907f67ed06efbc3338dfe6179796deefc1ff763fc1aee5535"
 
 [[package]]
+name = "bytes_parser"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d256752a090dedc5e22de6c7d441e3d80acc98307a9b4a2f72c8580f0a7a1455"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -436,11 +445,23 @@ dependencies = [
  "clap",
  "ctrlc",
  "env_logger",
+ "konsumer_offsets",
  "log",
  "rdkafka",
  "regex",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "konsumer_offsets"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "458c22594a34166c6b168628d237b9c0a4b677bff839a1aeb830c3ae0daa9429"
+dependencies = [
+ "bytes_parser",
+ "chrono",
+ "thiserror",
 ]
 
 [[package]]
