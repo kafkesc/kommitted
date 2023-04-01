@@ -11,7 +11,7 @@ use rdkafka::ClientConfig;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 
-use crate::internals::{Emitter, Register};
+use crate::internals::Emitter;
 
 pub fn init(
     admin_client_config: ClientConfig,

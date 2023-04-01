@@ -3,7 +3,6 @@ use std::sync::Arc;
 use tokio::sync::{mpsc::Receiver, RwLock};
 
 use super::emitter::ClusterStatus;
-use crate::internals::Register;
 use crate::kafka_types::Broker;
 
 /// Registers and exposes the latest [`ClusterStatus`].
@@ -15,10 +14,8 @@ pub struct ClusterStatusRegister {
     latest_status: Arc<RwLock<Option<ClusterStatus>>>,
 }
 
-impl Register for ClusterStatusRegister {
-    type Registered = ClusterStatus;
-
-    fn new(mut rx: Receiver<Self::Registered>) -> Self {
+impl ClusterStatusRegister {
+    pub fn new(mut rx: Receiver<ClusterStatus>) -> Self {
         let csr = Self {
             latest_status: Arc::new(RwLock::new(None)),
         };
@@ -46,17 +43,14 @@ impl Register for ClusterStatusRegister {
 
                 debug!(
                     "Updated cluster status: {} topics, {} brokers",
-                    t_len,
-                    b_len
+                    t_len, b_len
                 );
             }
         });
 
         csr
     }
-}
 
-impl ClusterStatusRegister {
     /// Current Topics present in the Kafka cluster.
     pub async fn get_topics(&self) -> Vec<String> {
         match &*(self.latest_status.read().await) {
