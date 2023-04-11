@@ -46,8 +46,8 @@ impl PartitionOffsetsEmitter {
     pub fn new(
         client_config: ClientConfig,
         cluster_register: Arc<ClusterStatusRegister>,
-    ) -> PartitionOffsetsEmitter {
-        PartitionOffsetsEmitter {
+    ) -> Self {
+        Self {
             client_config,
             cluster_register,
         }

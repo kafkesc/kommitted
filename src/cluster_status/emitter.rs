@@ -44,8 +44,8 @@ impl ClusterStatusEmitter {
     /// # Arguments
     ///
     /// * `client_config` - Kafka admin client configuration, used to fetch the Cluster current status
-    pub fn new(client_config: ClientConfig) -> ClusterStatusEmitter {
-        ClusterStatusEmitter {
+    pub fn new(client_config: ClientConfig) -> Self {
+        Self {
             admin_client_config: client_config,
         }
     }
