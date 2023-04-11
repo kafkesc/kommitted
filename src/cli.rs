@@ -45,7 +45,6 @@ pub struct Cli {
     /// Once this limit is reached, the oldest data points are discarded, realising
     /// a "moving window" of offsets history.
     #[arg(
-        short = 'h',
         long = "history",
         value_name = "SIZE",
         default_value = "3600",
