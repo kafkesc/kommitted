@@ -1,5 +1,9 @@
 # kcl
 
+## [WIP] Architecture Diagram
+
+![](https://docs.google.com/drawings/d/e/2PACX-1vTJf5vkITRpDPlL-icLwYHRbUB7Y2KGbkkdcKNhECJ3tdrUJud9Cr3Hnowp_nLN55aiZuw01hmzXNmw/pub?w=1008&h=761)
+
 ## License
 
 Licensed under either of
