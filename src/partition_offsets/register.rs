@@ -8,19 +8,33 @@ use super::emitter::PartitionOffset;
 use super::errors::{PartitionOffsetsError, PartitionOffsetsResult};
 use super::lag_estimator::PartitionLagEstimator;
 
-/// (Topic, Partition)
-type Key = (String, u32);
+/// A map key, made of the pair `(Topic, Partition)`.
+type TPKey = (String, u32);
 
-/// [`PartitionLagEstimator`], wrapped in a [`RwLock`] for cross thread concurrency.
-type Val = RwLock<PartitionLagEstimator>;
+/// A [`PartitionLagEstimator`], wrapped in a [`RwLock`] for cross thread concurrency.
+type PLEVal = RwLock<PartitionLagEstimator>;
 
 /// Holds the offset of all Topic Partitions in the Kafka Cluster, and can estimate lag of Consumers.
+///
+/// This is where a known Consumer Group, at a known offset in time, can get it's lag estimated.
 pub struct PartitionOffsetsRegister {
-    estimators: Arc<RwLock<HashMap<Key, Val>>>,
+    estimators: Arc<RwLock<HashMap<TPKey, PLEVal>>>,
 }
 
 impl PartitionOffsetsRegister {
-    pub fn new(mut rx: Receiver<PartitionOffset>, offsets_history: usize) -> Self {
+    /// Create a new [`Self`], able to hold the given offset history.
+    ///
+    /// # Arguments
+    ///
+    /// * `rx` - Channel [`Receiver`] for [`PartitionOffset`]
+    /// * `offsets_history` - For each Topic Partition, how much offset history to hold.
+    ///   History for each (`Topic, Partition`) pair is kept in a queue-like structure of this
+    ///   size. Each entry in the structure is the pair (`Offset, UTC TS`): each pair represents
+    ///   at what moment in time that particular offset was valid.
+    pub fn new(
+        mut rx: Receiver<PartitionOffset>,
+        offsets_history: usize,
+    ) -> Self {
         let por = Self {
             estimators: Arc::new(RwLock::new(HashMap::new())),
         };
@@ -39,14 +53,16 @@ impl PartitionOffsetsRegister {
             debug!("Begin receiving PartitionOffset updates");
 
             while let Some(po) = rx.recv().await {
-                let k: Key = (po.topic, po.partition);
+                let k: TPKey = (po.topic, po.partition);
 
                 // First, check if we need to create the estimator for this Key
                 let mut guard = estimators_clone.write().await;
                 if !guard.contains_key(&k) {
                     guard.insert(
                         k.clone(),
-                        RwLock::new(PartitionLagEstimator::new(offsets_history)),
+                        RwLock::new(PartitionLagEstimator::new(
+                            offsets_history,
+                        )),
                     );
                 }
 
@@ -80,7 +96,7 @@ impl PartitionOffsetsRegister {
         partition: u32,
         consumed_offset: u64,
     ) -> PartitionOffsetsResult<u64> {
-        let k: Key = (topic.to_string(), partition);
+        let k: TPKey = (topic.to_string(), partition);
 
         self.estimators
             .read()
@@ -110,7 +126,7 @@ impl PartitionOffsetsRegister {
         consumed_offset: u64,
         consumed_offset_datetime: DateTime<Utc>,
     ) -> PartitionOffsetsResult<Duration> {
-        let k: Key = (topic.to_string(), partition);
+        let k: TPKey = (topic.to_string(), partition);
 
         self.estimators
             .read()
@@ -136,13 +152,13 @@ impl PartitionOffsetsRegister {
         topic: &str,
         partition: u32,
     ) -> bool {
-        let k: Key = (topic.to_string(), partition);
+        let k: TPKey = (topic.to_string(), partition);
 
         self.estimators.read().await.contains_key(&k)
     }
 
     /// Get all the `(topic, partition)` tuples it contains.
-    pub async fn get_topic_partitions(&self) -> HashSet<Key> {
+    pub async fn get_topic_partitions(&self) -> HashSet<TPKey> {
         HashSet::from_iter(self.estimators.read().await.keys().cloned())
     }
 }

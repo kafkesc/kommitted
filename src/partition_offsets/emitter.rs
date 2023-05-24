@@ -32,6 +32,11 @@ pub struct PartitionOffset {
     pub read_datetime: DateTime<Utc>,
 }
 
+/// Emits Topic Partitions offset watermarks as [`PartitionOffset`] instances.
+///
+/// The watermarks are the "earliest" and "latest" known offset of a specific partition.
+/// Additionally, the "read time" wall clock is provided, so _when_ the watermarks were
+/// read is also known.
 pub struct PartitionOffsetsEmitter {
     client_config: ClientConfig,
     cluster_register: Arc<ClusterStatusRegister>,
@@ -42,7 +47,7 @@ impl PartitionOffsetsEmitter {
     ///
     /// # Arguments
     ///
-    /// * `client_config` - Kafka admin client configuration, used to fetch the Topic Partitions offsets (earliest, latest)
+    /// * `client_config` - Kafka client configuration, used to fetch the Topic Partitions offset watermarks (earliest, latest)
     pub fn new(
         client_config: ClientConfig,
         cluster_register: Arc<ClusterStatusRegister>,
@@ -96,7 +101,6 @@ impl Emitter for PartitionOffsetsEmitter {
                                 };
 
                                 tokio::select! {
-                                    // Send the latest `ClusterStatus`
                                     res = sx.send_timeout(po, SEND_TIMEOUT) => {
                                         if let Err(e) = res {
                                             error!("Failed to emit partition offsets: {e}");
@@ -104,7 +108,7 @@ impl Emitter for PartitionOffsetsEmitter {
                                     },
 
                                     // Initiate shutdown: by letting this task conclude,
-                                    // the receiver of `PartitionOffsets` will detect the channel is closing
+                                    // the receiver will detect the channel is closing
                                     // on the sender end, and conclude its own activity/task.
                                     _ = shutdown_rx.recv() => {
                                         info!("Received shutdown signal");

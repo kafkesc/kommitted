@@ -41,9 +41,8 @@ impl BroadcastEmitter for ConsumerOffsetsEmitter {
             config.set("group.id", "TODO");
         }
 
-        let consumer_client: StreamConsumer = config
-            .create()
-            .expect("Failed to allocate Consumer Client");
+        let consumer_client: StreamConsumer =
+            config.create().expect("Failed to allocate Consumer Client");
 
         consumer_client
             .subscribe(&["__consumer_offsets"])
@@ -65,7 +64,9 @@ impl BroadcastEmitter for ConsumerOffsetsEmitter {
                     r_msg = consumer_client.recv() => {
                         match r_msg {
                             Ok(m) => {
-                                match konsumer_offsets::KonsumerOffsetsData::try_from_bytes(m.key(), m.payload()) {
+                                let res_kod = konsumer_offsets::KonsumerOffsetsData::try_from_bytes(m.key(), m.payload());
+
+                                match res_kod {
                                     Ok(kod) => {
                                         let ch_cap = CHANNEL_SIZE - sx.len();
                                         if ch_cap == 0 {
@@ -86,8 +87,9 @@ impl BroadcastEmitter for ConsumerOffsetsEmitter {
                             }
                         }
                     }
+
                     // Initiate shutdown: by letting this task conclude,
-                    // the receiver of `ClusterStatus` will detect the channel is closing
+                    // the receiver will detect the channel is closing
                     // on the sender end, and conclude its own activity/task.
                     _ = shutdown_rx.recv() => {
                         info!("Received shutdown signal");
