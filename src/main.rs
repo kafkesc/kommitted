@@ -3,6 +3,7 @@ extern crate log;
 
 mod cli;
 mod cluster_status;
+mod consumer_groups;
 mod consumer_offsets;
 mod internals;
 mod kafka_types;
