@@ -1,4 +1,7 @@
-use rdkafka::{admin::AdminClient, client::DefaultClientContext, ClientConfig};
+use rdkafka::{
+    admin::AdminClient, client::DefaultClientContext, metadata::Metadata,
+    ClientConfig,
+};
 use tokio::{
     sync::{broadcast, mpsc},
     task::JoinHandle,
@@ -26,6 +29,19 @@ pub struct ClusterStatus {
     ///
     /// It reflects the status of Brokers as reported by the Kafka cluster.
     pub brokers: Vec<Broker>,
+}
+
+impl From<Metadata> for ClusterStatus {
+    fn from(m: Metadata) -> Self {
+        Self {
+            topics: m
+                .topics()
+                .iter()
+                .map(TopicPartitionsStatus::from)
+                .collect(),
+            brokers: m.brokers().iter().map(Broker::from).collect(),
+        }
+    }
 }
 
 /// Emits [`ClusterStatus`] via a provided [`mpsc::channel`].
@@ -73,35 +89,25 @@ impl Emitter for ClusterStatusEmitter {
             .create()
             .expect("Failed to allocate Admin Client");
 
-        let (sx, rx) = mpsc::channel::<ClusterStatus>(CHANNEL_SIZE);
+        let (sx, rx) = mpsc::channel::<Self::Emitted>(CHANNEL_SIZE);
 
         let join_handle = tokio::spawn(async move {
             let mut interval = interval(FETCH_INTERVAL);
 
             'outer: loop {
-                match admin_client.inner().fetch_metadata(None, FETCH_TIMEOUT) {
-                    Ok(m) => {
-                        // NOTE: Turn metadata into our `Send`-able type
-                        let status = ClusterStatus {
-                            topics: m
-                                .topics()
-                                .iter()
-                                .map(TopicPartitionsStatus::from)
-                                .collect(),
-                            brokers: m
-                                .brokers()
-                                .iter()
-                                .map(Broker::from)
-                                .collect(),
-                        };
+                let res_status = admin_client
+                    .inner()
+                    .fetch_metadata(None, FETCH_TIMEOUT)
+                    .map(Self::Emitted::from);
 
+                match res_status {
+                    Ok(status) => {
                         let ch_cap = sx.capacity();
                         if ch_cap == 0 {
                             warn!("Emitting channel saturated: receiver too slow?");
                         }
 
                         tokio::select! {
-                            // Send the latest `ClusterStatus`
                             res = sx.send_timeout(status, SEND_TIMEOUT) => {
                                 if let Err(e) = res {
                                     error!("Failed to emit cluster status: {e}");
@@ -109,7 +115,7 @@ impl Emitter for ClusterStatusEmitter {
                             },
 
                             // Initiate shutdown: by letting this task conclude,
-                            // the receiver of `ClusterStatus` will detect the channel is closing
+                            // the receiver will detect the channel is closing
                             // on the sender end, and conclude its own activity/task.
                             _ = shutdown_rx.recv() => {
                                 info!("Received shutdown signal");
