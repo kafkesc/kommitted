@@ -4,9 +4,10 @@ extern crate log;
 mod cli;
 mod cluster_status;
 mod consumer_groups;
-mod consumer_offsets;
+mod consumer_offsets_register;
 mod internals;
 mod kafka_types;
+mod konsumer_offsets_data;
 mod logging;
 mod partition_offsets;
 
@@ -15,6 +16,7 @@ use std::sync::Arc;
 
 use tokio::sync::broadcast;
 
+use crate::internals::{BroadcastEmitter, Emitter};
 use cli::Cli;
 
 #[tokio::main]
@@ -38,8 +40,34 @@ async fn main() -> Result<(), Box<dyn Error>> {
         shutdown_rx.resubscribe(),
     );
 
+    // TODO / WIP: `konsumer_offsets_data` module
+    let konsumer_offsets_data_emitter =
+        konsumer_offsets_data::KonsumerOffsetsDataEmitter::new(
+            admin_client_config.clone(),
+        );
+
+    let (mut kode_rx, kode_join) =
+        konsumer_offsets_data_emitter.spawn(shutdown_rx.resubscribe());
+    tokio::spawn(async move {
+        while let Ok(kod) = kode_rx.recv().await {
+            debug!("{:#?}", kod);
+        }
+    });
+
+    // TODO / WIP: `consumer_groups` module
+    let consumer_groups_emitter = consumer_groups::ConsumerGroupsEmitter::new(
+        admin_client_config.clone(),
+    );
+    let (mut cge_rx, cge_join) =
+        consumer_groups_emitter.spawn(shutdown_rx.resubscribe());
+    tokio::spawn(async move {
+       while let Ok(cg) = cge_rx.recv().await {
+           debug!("{:#?}", cg);
+       }
+    });
+
     // Join all the async tasks, then let it terminate
-    let _ = tokio::join!(cs_join, po_join);
+    let _ = tokio::join!(cs_join, po_join, kode_join, cge_join);
     Ok(())
 }
 

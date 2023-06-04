@@ -11,14 +11,19 @@ use tokio::task::JoinHandle;
 use tokio::time::interval;
 
 const CHANNEL_SIZE: usize = 1000;
-
 const POLL_INTERVAL: Duration = Duration::from_millis(5);
 
-pub struct ConsumerOffsetsEmitter {
+/// Emits [`KonsumerOffsetsData`] via a provided [`broadcast::channel`].
+///
+/// It wraps a Kafka Client, consumes the `__consumer_offsets` topic, and emits its records
+/// parsed into [`KonsumerOffsetsData`].
+///
+/// It shuts down by sending a unit via a provided [`broadcast`].
+pub struct KonsumerOffsetsDataEmitter {
     consumer_client_config: ClientConfig,
 }
 
-impl ConsumerOffsetsEmitter {
+impl KonsumerOffsetsDataEmitter {
     pub fn new(client_config: ClientConfig) -> Self {
         Self {
             consumer_client_config: client_config,
@@ -26,7 +31,7 @@ impl ConsumerOffsetsEmitter {
     }
 }
 
-impl BroadcastEmitter for ConsumerOffsetsEmitter {
+impl BroadcastEmitter for KonsumerOffsetsDataEmitter {
     type Emitted = KonsumerOffsetsData;
 
     fn spawn(

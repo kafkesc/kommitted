@@ -1,5 +1,4 @@
 // Inner module
 mod emitter;
-mod register;
 
-use crate::internals::Emitter;
+pub use emitter::{ConsumerGroups, ConsumerGroupsEmitter, Group, Member};
