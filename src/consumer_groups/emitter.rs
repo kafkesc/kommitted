@@ -14,8 +14,7 @@ use crate::internals::Emitter;
 
 const CHANNEL_SIZE: usize = 1;
 const SEND_TIMEOUT: Duration = Duration::from_millis(100);
-
-const FETCH_TIMEOUT: Duration = Duration::from_millis(100);
+const FETCH_TIMEOUT: Duration = Duration::from_secs(1);
 const FETCH_INTERVAL: Duration = Duration::from_secs(1);
 
 /// Holds Consumer Group Member information, like `client.id`, host and other client specifics.
@@ -139,10 +138,6 @@ impl Emitter for ConsumerGroupsEmitter {
                                     error!("Failed to emit consumer groups: {e}");
                                 }
                             },
-
-                            // Initiate shutdown: by letting this task conclude,
-                            // the receiver will detect the channel is closing
-                            // on the sender end, and conclude its own activity/task.
                             _ = shutdown_rx.recv() => {
                                 info!("Received shutdown signal");
                                 break 'outer;

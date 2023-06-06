@@ -12,8 +12,7 @@ use crate::internals::Emitter;
 use crate::kafka_types::{Broker, TopicPartitionsStatus};
 
 const CHANNEL_SIZE: usize = 1;
-const SEND_TIMEOUT: Duration = Duration::from_millis(100);
-
+const SEND_TIMEOUT: Duration = Duration::from_millis(500);
 const FETCH_TIMEOUT: Duration = Duration::from_secs(5);
 const FETCH_INTERVAL: Duration = Duration::from_secs(10);
 
@@ -113,10 +112,6 @@ impl Emitter for ClusterStatusEmitter {
                                     error!("Failed to emit cluster status: {e}");
                                 }
                             },
-
-                            // Initiate shutdown: by letting this task conclude,
-                            // the receiver will detect the channel is closing
-                            // on the sender end, and conclude its own activity/task.
                             _ = shutdown_rx.recv() => {
                                 info!("Received shutdown signal");
                                 break 'outer;

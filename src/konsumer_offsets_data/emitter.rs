@@ -11,7 +11,8 @@ use tokio::task::JoinHandle;
 use tokio::time::interval;
 
 const CHANNEL_SIZE: usize = 1000;
-const POLL_INTERVAL: Duration = Duration::from_millis(5);
+const POLL_INTERVAL: Duration = Duration::from_millis(100);
+const KONSUMER_OFFSETS_DATA_TOPIC: &'static str = "__consumer_offsets";
 
 /// Emits [`KonsumerOffsetsData`] via a provided [`broadcast::channel`].
 ///
@@ -29,6 +30,16 @@ impl KonsumerOffsetsDataEmitter {
             consumer_client_config: client_config,
         }
     }
+
+    fn set_kafka_config(mut client_config: ClientConfig) -> ClientConfig {
+        client_config.set("enable.auto.commit", "true");
+        client_config.set("auto.offset.reset", "earliest");
+        if client_config.get("group.id").is_none() {
+            client_config.set("group.id", std::any::type_name::<Self>());
+        }
+
+        client_config
+    }
 }
 
 impl BroadcastEmitter for KonsumerOffsetsDataEmitter {
@@ -38,20 +49,16 @@ impl BroadcastEmitter for KonsumerOffsetsDataEmitter {
         &self,
         mut shutdown_rx: Receiver<()>,
     ) -> (Receiver<Self::Emitted>, JoinHandle<()>) {
-        let mut config = self.consumer_client_config.clone();
-        let config = config
-            .set("enable.auto.commit", "true")
-            .set("auto.offset.reset", "earliest");
-        if config.get("group.id").is_none() {
-            config.set("group.id", "TODO");
-        }
+        let config =
+            Self::set_kafka_config(self.consumer_client_config.clone());
 
         let consumer_client: StreamConsumer =
-            config.create().expect("Failed to allocate Consumer Client");
+            config.create().expect("Failed to create Consumer Client");
 
-        consumer_client
-            .subscribe(&["__consumer_offsets"])
-            .expect("Failed to subscribe to '__consumer_offsets'");
+        consumer_client.subscribe(&[KONSUMER_OFFSETS_DATA_TOPIC]).expect(
+            format!("Failed to subscribe to '{}'", KONSUMER_OFFSETS_DATA_TOPIC)
+                .as_str(),
+        );
 
         // TODO
         //   1. Define configuration/logic to start the read of the topic from "earliest" or
@@ -92,10 +99,6 @@ impl BroadcastEmitter for KonsumerOffsetsDataEmitter {
                             }
                         }
                     }
-
-                    // Initiate shutdown: by letting this task conclude,
-                    // the receiver will detect the channel is closing
-                    // on the sender end, and conclude its own activity/task.
                     _ = shutdown_rx.recv() => {
                         info!("Received shutdown signal");
                         break;

@@ -61,7 +61,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let (mut cge_rx, cge_join) =
         consumer_groups_emitter.spawn(shutdown_rx.resubscribe());
     tokio::spawn(async move {
-       while let Ok(cg) = cge_rx.recv().await {
+       while let Some(cg) = cge_rx.recv().await {
            debug!("{:#?}", cg);
        }
     });

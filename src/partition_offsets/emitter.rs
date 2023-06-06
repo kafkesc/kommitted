@@ -79,7 +79,7 @@ impl Emitter for PartitionOffsetsEmitter {
 
             'outer: loop {
                 for t in csr.get_topics().await {
-                    trace!("Fetching earlist/latest offset for Partitions of Topic '{}'", t);
+                    trace!("Fetching earliest/latest offset for Partitions of Topic '{}'", t);
 
                     for p in csr
                         .get_topic_partitions(t.as_str())
@@ -106,10 +106,6 @@ impl Emitter for PartitionOffsetsEmitter {
                                             error!("Failed to emit partition offsets: {e}");
                                         }
                                     },
-
-                                    // Initiate shutdown: by letting this task conclude,
-                                    // the receiver will detect the channel is closing
-                                    // on the sender end, and conclude its own activity/task.
                                     _ = shutdown_rx.recv() => {
                                         info!("Received shutdown signal");
                                         break 'outer;
