@@ -1,5 +1,6 @@
-use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use std::collections::VecDeque;
+
+use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 
 use super::errors::{PartitionOffsetsError, PartitionOffsetsResult};
 use super::known_offset::KnownOffset;

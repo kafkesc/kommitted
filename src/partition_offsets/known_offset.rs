@@ -1,5 +1,6 @@
-use chrono::{DateTime, Utc};
 use std::cmp::Ordering;
+
+use chrono::{DateTime, Utc};
 
 /// An Offset in a Topic Partition, and the date-time at which it is known.
 ///

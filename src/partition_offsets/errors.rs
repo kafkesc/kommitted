@@ -1,6 +1,5 @@
-use thiserror::Error;
-
 use chrono::{DateTime, Utc};
+use thiserror::Error;
 
 /// Possible errors from the [`super::lag_estimator`] module.
 #[derive(Error, Debug, Eq, PartialEq)]

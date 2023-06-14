@@ -1,14 +1,19 @@
-use crate::internals::BroadcastEmitter;
-use konsumer_offsets::KonsumerOffsetsData;
 use rdkafka::{
+    admin::AdminClient,
+    client::DefaultClientContext,
     consumer::{Consumer, StreamConsumer},
+    groups::GroupList,
     ClientConfig, Message,
 };
-use std::time::Duration;
-use tokio::sync::broadcast;
-use tokio::sync::broadcast::Receiver;
-use tokio::task::JoinHandle;
-use tokio::time::interval;
+use tokio::{
+    sync::broadcast,
+    task::JoinHandle,
+    time::{interval, Duration},
+};
+
+use konsumer_offsets::KonsumerOffsetsData;
+
+use crate::internals::BroadcastEmitter;
 
 const CHANNEL_SIZE: usize = 1000;
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
@@ -47,8 +52,8 @@ impl BroadcastEmitter for KonsumerOffsetsDataEmitter {
 
     fn spawn(
         &self,
-        mut shutdown_rx: Receiver<()>,
-    ) -> (Receiver<Self::Emitted>, JoinHandle<()>) {
+        mut shutdown_rx: broadcast::Receiver<()>,
+    ) -> (broadcast::Receiver<Self::Emitted>, JoinHandle<()>) {
         let config =
             Self::set_kafka_config(self.consumer_client_config.clone());
 

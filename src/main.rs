@@ -16,8 +16,8 @@ use std::sync::Arc;
 
 use tokio::sync::broadcast;
 
-use crate::internals::{BroadcastEmitter, Emitter};
 use cli::Cli;
+use internals::{BroadcastEmitter, Emitter};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
