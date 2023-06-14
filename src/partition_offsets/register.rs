@@ -55,29 +55,37 @@ impl PartitionOffsetsRegister {
         tokio::spawn(async move {
             debug!("Begin receiving PartitionOffset updates");
 
-            while let Some(po) = rx.recv().await {
-                let k: TPKey = (po.topic, po.partition);
+            loop {
+                tokio::select! {
+                    Some(po) = rx.recv() => {
+                        let k: TPKey = (po.topic, po.partition);
 
-                // First, check if we need to create the estimator for this Key
-                let mut guard = estimators_clone.write().await;
-                if !guard.contains_key(&k) {
-                    guard.insert(
-                        k.clone(),
-                        RwLock::new(PartitionLagEstimator::new(
-                            offsets_history,
-                        )),
-                    );
+                        // First, check if we need to create the estimator for this Key
+                        let mut guard = estimators_clone.write().await;
+                        if !guard.contains_key(&k) {
+                            guard.insert(
+                                k.clone(),
+                                RwLock::new(PartitionLagEstimator::new(
+                                    offsets_history,
+                                )),
+                            );
+                        }
+
+                        trace!("Updating Partition: {:?}", k);
+                        // Second, update the PartitionLagEstimator for this Key
+                        guard
+                            .downgrade() //< Here the exclusive write lock, becomes a read lock
+                            .get(&k)
+                            .unwrap_or_else(|| panic!("PartitionLagEstimator for {:#?} could not be found: this should never happen!", k))
+                            .write()
+                            .await
+                            .update(po.latest_offset, po.read_datetime);
+                    },
+                    else => {
+                        info!("Emitters stopping: breaking (internal) loop");
+                        break;
+                    }
                 }
-
-                trace!("Updating Partition: {:?}", k);
-                // Second, update the PartitionLagEstimator for this Key
-                guard
-                    .downgrade() //< Here the exclusive write lock, becomes a read lock
-                    .get(&k)
-                    .unwrap_or_else(|| panic!("PartitionLagEstimator for {:#?} could not be found: this should never happen!", k))
-                    .write()
-                    .await
-                    .update(po.latest_offset, po.read_datetime);
             }
         });
 

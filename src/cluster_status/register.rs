@@ -33,18 +33,26 @@ impl ClusterStatusRegister {
         tokio::spawn(async move {
             debug!("Begin receiving ClusterStatus updates");
 
-            while let Some(cs) = rx.recv().await {
-                trace!("Received:\n{:#?}", cs);
+            loop {
+                tokio::select! {
+                    Some(cs) = rx.recv() => {
+                        trace!("Received:\n{:#?}", cs);
 
-                let t_len = cs.topics.len();
-                let b_len = cs.brokers.len();
+                        let t_len = cs.topics.len();
+                        let b_len = cs.brokers.len();
 
-                *(latest_status_arc_clone.write().await) = Some(cs);
+                        *(latest_status_arc_clone.write().await) = Some(cs);
 
-                debug!(
-                    "Updated cluster status: {} topics, {} brokers",
-                    t_len, b_len
-                );
+                        debug!(
+                            "Updated cluster status: {} topics, {} brokers",
+                            t_len, b_len
+                        );
+                    },
+                    else => {
+                        info!("Emitters stopping: breaking (internal) loop");
+                        break;
+                    }
+                }
             }
         });
 
