@@ -57,6 +57,8 @@ impl Lag {
 #[derive(Debug, Clone, Default)]
 pub struct GroupWithLag {
     group: Group,
+    // TODO Wrap in a `RwLock` so we can modify a specific group lag,
+    //   without holding a w-lock on the whole register
     lag_by_topic_partition: HashMap<TopicPartition, Lag>,
 }
 
