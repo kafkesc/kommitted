@@ -7,25 +7,24 @@ use rdkafka::{
 use tokio::{
     sync::{broadcast, mpsc},
     task::JoinHandle,
-    time::{interval, Duration},
+    time::{interval, Duration, Interval},
 };
+use async_trait::async_trait;
 
 use crate::internals::Emitter;
 use crate::kafka_types::{Group, Member};
 
-const CHANNEL_SIZE: usize = 1;
-const SEND_TIMEOUT: Duration = Duration::from_millis(100);
-const FETCH_TIMEOUT: Duration = Duration::from_secs(1);
-const FETCH_INTERVAL: Duration = Duration::from_secs(1);
+const CHANNEL_SIZE: usize = 5;
 
-
+const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
+const FETCH_INTERVAL: Duration = Duration::from_secs(60);
 
 /// A map of all the known Consumer Groups, at a given point in time.
 ///
 /// This reflects the internal state of Kafka and it's active Consumer Groups.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ConsumerGroups {
-    groups: HashMap<String, Group>,
+    pub(crate) groups: HashMap<String, Group>,
 }
 
 impl From<GroupList> for ConsumerGroups {
@@ -87,6 +86,7 @@ impl ConsumerGroupsEmitter {
     }
 }
 
+#[async_trait]
 impl Emitter for ConsumerGroupsEmitter {
     type Emitted = ConsumerGroups;
 
@@ -112,15 +112,10 @@ impl Emitter for ConsumerGroupsEmitter {
 
                 match res_groups {
                     Ok(groups) => {
-                        let ch_cap = sx.capacity();
-                        if ch_cap == 0 {
-                            warn!("Emitting channel saturated: receiver too slow?");
-                        }
-
                         tokio::select! {
-                            res = sx.send_timeout(groups, SEND_TIMEOUT) => {
+                            res = Self::emit_with_interval(&sx, groups, &mut interval) => {
                                 if let Err(e) = res {
-                                    error!("Failed to emit consumer groups: {e}");
+                                    error!("Failed to emit {}: {e}", std::any::type_name::<ConsumerGroups>());
                                 }
                             },
                             _ = shutdown_rx.recv() => {
@@ -133,8 +128,6 @@ impl Emitter for ConsumerGroupsEmitter {
                         error!("Failed to fetch consumer groups: {e}");
                     },
                 }
-
-                interval.tick().await;
             }
         });
 

@@ -5,16 +5,17 @@ use rdkafka::{
 use tokio::{
     sync::{broadcast, mpsc},
     task::JoinHandle,
-    time::{interval, Duration},
+    time::{interval, Duration, Interval},
 };
+use async_trait::async_trait;
 
 use crate::internals::Emitter;
 use crate::kafka_types::{Broker, TopicPartitionsStatus};
 
-const CHANNEL_SIZE: usize = 1;
-const SEND_TIMEOUT: Duration = Duration::from_millis(500);
-const FETCH_TIMEOUT: Duration = Duration::from_secs(5);
-const FETCH_INTERVAL: Duration = Duration::from_secs(10);
+const CHANNEL_SIZE: usize = 5;
+
+const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
+const FETCH_INTERVAL: Duration = Duration::from_secs(60);
 
 /// This is a `Send`-able struct to carry Kafka Cluster status across thread boundaries.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
@@ -66,6 +67,7 @@ impl ClusterStatusEmitter {
     }
 }
 
+#[async_trait]
 impl Emitter for ClusterStatusEmitter {
     type Emitted = ClusterStatus;
 
@@ -101,15 +103,10 @@ impl Emitter for ClusterStatusEmitter {
 
                 match res_status {
                     Ok(status) => {
-                        let ch_cap = sx.capacity();
-                        if ch_cap == 0 {
-                            warn!("Emitting channel saturated: receiver too slow?");
-                        }
-
                         tokio::select! {
-                            res = sx.send_timeout(status, SEND_TIMEOUT) => {
+                            res = Self::emit_with_interval(&sx, status, &mut interval) => {
                                 if let Err(e) = res {
-                                    error!("Failed to emit cluster status: {e}");
+                                    error!("Failed to emit {}: {e}", std::any::type_name::<ClusterStatus>());
                                 }
                             },
                             _ = shutdown_rx.recv() => {
@@ -122,8 +119,6 @@ impl Emitter for ClusterStatusEmitter {
                         error!("Failed to fetch cluster metadata: {e}");
                     },
                 }
-
-                interval.tick().await;
             }
         });
 

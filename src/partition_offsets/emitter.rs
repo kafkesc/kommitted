@@ -7,15 +7,15 @@ use tokio::{
     task::JoinHandle,
     time::{interval, Duration},
 };
+use async_trait::async_trait;
 
 use crate::cluster_status::ClusterStatusRegister;
 use crate::internals::Emitter;
 
-const CHANNEL_SIZE: usize = 1;
-const SEND_TIMEOUT: Duration = Duration::from_millis(100);
+const CHANNEL_SIZE: usize = 5;
 
-const FETCH_TIMEOUT: Duration = Duration::from_millis(100);
-const FETCH_INTERVAL: Duration = Duration::from_secs(1);
+const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
+const FETCH_INTERVAL: Duration = Duration::from_millis(200);
 
 /// Offset information for a Topic Partition.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
@@ -59,6 +59,7 @@ impl PartitionOffsetsEmitter {
     }
 }
 
+#[async_trait]
 impl Emitter for PartitionOffsetsEmitter {
     type Emitted = PartitionOffset;
 
@@ -101,9 +102,9 @@ impl Emitter for PartitionOffsetsEmitter {
                                 };
 
                                 tokio::select! {
-                                    res = sx.send_timeout(po, SEND_TIMEOUT) => {
+                                    res = Self::emit_with_interval(&sx, po, &mut interval) => {
                                         if let Err(e) = res {
-                                            error!("Failed to emit partition offsets: {e}");
+                                            error!("Failed to emit {}: {e}", std::any::type_name::<PartitionOffset>());
                                         }
                                     },
                                     _ = shutdown_rx.recv() => {
@@ -118,8 +119,6 @@ impl Emitter for PartitionOffsetsEmitter {
                         }
                     }
                 }
-
-                interval.tick().await;
             }
         });
 
