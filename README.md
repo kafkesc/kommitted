@@ -1,4 +1,10 @@
-# kcl
+# KCL - Kafka Consumer Lag
+
+<div align="center" style="text-align: center;">
+
+Care about your Customers, measure your Kafka Consumer Lag
+
+</div>
 
 ## [WIP] Architecture Diagram
 
