@@ -4,7 +4,7 @@ use rdkafka::metadata::{MetadataPartition, MetadataTopic};
 ///
 /// In details, it describes where each partition is, which broker leads each partition,
 /// and which follower broker is in sync with each partition.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct TopicPartitionsStatus {
     pub name: String,
     pub partitions: Vec<PartitionStatus>,
@@ -26,7 +26,7 @@ impl From<&MetadataTopic> for TopicPartitionsStatus {
 /// For a given Partition, it describes its status as reported by the Kafka cluster.
 ///
 /// The details make sense only in the context of the containing Topic.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct PartitionStatus {
     pub id: u32,
     pub leader_broker: u32,

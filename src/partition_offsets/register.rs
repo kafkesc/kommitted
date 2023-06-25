@@ -11,8 +11,7 @@ use super::emitter::PartitionOffset;
 use super::errors::{PartitionOffsetsError, PartitionOffsetsResult};
 use super::lag_estimator::PartitionLagEstimator;
 
-/// A map key, made of the pair `(Topic, Partition)`.
-type TPKey = (String, u32);
+use crate::kafka_types::TopicPartition;
 
 /// A [`PartitionLagEstimator`], wrapped in a [`RwLock`] for cross thread concurrency.
 type PLEVal = RwLock<PartitionLagEstimator>;
@@ -21,7 +20,7 @@ type PLEVal = RwLock<PartitionLagEstimator>;
 ///
 /// This is where a known Consumer Group, at a known offset in time, can get it's lag estimated.
 pub struct PartitionOffsetsRegister {
-    estimators: Arc<RwLock<HashMap<TPKey, PLEVal>>>,
+    estimators: Arc<RwLock<HashMap<TopicPartition, PLEVal>>>,
 }
 
 impl PartitionOffsetsRegister {
@@ -58,12 +57,15 @@ impl PartitionOffsetsRegister {
             loop {
                 tokio::select! {
                     Some(po) = rx.recv() => {
-                        let k: TPKey = (po.topic, po.partition);
+                        let k = TopicPartition{
+                            topic: po.topic,
+                            partition: po.partition,
+                        };
 
                         // First, check if we need to create the estimator for this Key
-                        let mut guard = estimators_clone.write().await;
-                        if !guard.contains_key(&k) {
-                            guard.insert(
+                        let mut w_guard = estimators_clone.write().await;
+                        if !w_guard.contains_key(&k) {
+                            w_guard.insert(
                                 k.clone(),
                                 RwLock::new(PartitionLagEstimator::new(
                                     offsets_history,
@@ -73,10 +75,10 @@ impl PartitionOffsetsRegister {
 
                         trace!("Updating Partition: {:?}", k);
                         // Second, update the PartitionLagEstimator for this Key
-                        guard
+                        w_guard
                             .downgrade() //< Here the exclusive write lock, becomes a read lock
                             .get(&k)
-                            .unwrap_or_else(|| panic!("PartitionLagEstimator for {:#?} could not be found: this should never happen!", k))
+                            .expect(format!("PartitionLagEstimator for {:#?} could not be found: this should never happen!", k).as_str())
                             .write()
                             .await
                             .update(po.latest_offset, po.read_datetime);
@@ -107,7 +109,10 @@ impl PartitionOffsetsRegister {
         partition: u32,
         consumed_offset: u64,
     ) -> PartitionOffsetsResult<u64> {
-        let k: TPKey = (topic.to_string(), partition);
+        let k = TopicPartition {
+            topic: topic.to_string(),
+            partition,
+        };
 
         self.estimators
             .read()
@@ -137,7 +142,10 @@ impl PartitionOffsetsRegister {
         consumed_offset: u64,
         consumed_offset_datetime: DateTime<Utc>,
     ) -> PartitionOffsetsResult<Duration> {
-        let k: TPKey = (topic.to_string(), partition);
+        let k = TopicPartition {
+            topic: topic.to_string(),
+            partition,
+        };
 
         self.estimators
             .read()
@@ -163,13 +171,16 @@ impl PartitionOffsetsRegister {
         topic: &str,
         partition: u32,
     ) -> bool {
-        let k: TPKey = (topic.to_string(), partition);
+        let k = TopicPartition {
+            topic: topic.to_string(),
+            partition,
+        };
 
         self.estimators.read().await.contains_key(&k)
     }
 
     /// Get all the `(topic, partition)` tuples it contains.
-    pub async fn get_topic_partitions(&self) -> HashSet<TPKey> {
+    pub async fn get_topic_partitions(&self) -> HashSet<TopicPartition> {
         HashSet::from_iter(self.estimators.read().await.keys().cloned())
     }
 }

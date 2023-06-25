@@ -4,7 +4,7 @@ use rdkafka::metadata::MetadataBroker;
 ///
 /// It is identified by a unique identifier for the given Cluster,
 /// and the host and port to connect to it.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct Broker {
     pub id: u32,
     pub host: String,

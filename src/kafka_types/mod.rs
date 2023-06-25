@@ -4,7 +4,11 @@
 //! we get back from querying the Kafka cluster metadata.
 
 mod broker;
+mod group;
+mod topic_partition;
 mod topic_partitions_status;
 
 pub use broker::Broker;
+pub use group::{Group, Member};
+pub use topic_partition::TopicPartition;
 pub use topic_partitions_status::{PartitionStatus, TopicPartitionsStatus};

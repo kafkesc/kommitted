@@ -1,4 +1,4 @@
 // Inner module
 mod emitter;
 
-pub use emitter::{ConsumerGroups, ConsumerGroupsEmitter, Group, Member};
+pub use emitter::{ConsumerGroups, ConsumerGroupsEmitter};

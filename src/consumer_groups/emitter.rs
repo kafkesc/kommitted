@@ -11,29 +11,14 @@ use tokio::{
 };
 
 use crate::internals::Emitter;
+use crate::kafka_types::{Group, Member};
 
 const CHANNEL_SIZE: usize = 1;
 const SEND_TIMEOUT: Duration = Duration::from_millis(100);
 const FETCH_TIMEOUT: Duration = Duration::from_secs(1);
 const FETCH_INTERVAL: Duration = Duration::from_secs(1);
 
-/// Holds Consumer Group Member information, like `client.id`, host and other client specifics.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
-pub struct Member {
-    id: String,
-    client_id: String,
-    client_host: String,
-}
 
-/// Hold Consumer Group information, like memberships.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct Group {
-    name: String,
-    members: HashMap<String, Member>,
-    protocol: String,
-    protocol_type: String,
-    state: String,
-}
 
 /// A map of all the known Consumer Groups, at a given point in time.
 ///
