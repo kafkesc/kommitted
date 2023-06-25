@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use rdkafka::{
     admin::AdminClient,
     client::DefaultClientContext,
@@ -6,10 +7,9 @@ use rdkafka::{
     ClientConfig, Message,
 };
 use tokio::{
-    sync::{mpsc, broadcast},
+    sync::{broadcast, mpsc},
     task::JoinHandle,
 };
-use async_trait::async_trait;
 
 use konsumer_offsets::KonsumerOffsetsData;
 

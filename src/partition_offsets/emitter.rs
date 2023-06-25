@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use rdkafka::{admin::AdminClient, client::DefaultClientContext, ClientConfig};
 use tokio::{
@@ -7,7 +8,6 @@ use tokio::{
     task::JoinHandle,
     time::{interval, Duration},
 };
-use async_trait::async_trait;
 
 use crate::cluster_status::ClusterStatusRegister;
 use crate::internals::Emitter;

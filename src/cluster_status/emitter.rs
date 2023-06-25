@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use rdkafka::{
     admin::AdminClient, client::DefaultClientContext, metadata::Metadata,
     ClientConfig,
@@ -7,7 +8,6 @@ use tokio::{
     task::JoinHandle,
     time::{interval, Duration, Interval},
 };
-use async_trait::async_trait;
 
 use crate::internals::Emitter;
 use crate::kafka_types::{Broker, TopicPartitionsStatus};
