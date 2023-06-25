@@ -1,3 +1,3 @@
 mod emitter;
 
-pub use emitter::{BroadcastEmitter, Emitter};
+pub use emitter::Emitter;
