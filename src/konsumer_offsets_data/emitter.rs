@@ -6,20 +6,20 @@ use rdkafka::{
     ClientConfig, Message,
 };
 use tokio::{
-    sync::broadcast,
+    sync::{mpsc, broadcast},
     task::JoinHandle,
-    time::{interval, Duration},
 };
+use async_trait::async_trait;
 
 use konsumer_offsets::KonsumerOffsetsData;
 
-use crate::internals::BroadcastEmitter;
+use crate::internals::Emitter;
 
 const CHANNEL_SIZE: usize = 1000;
-const POLL_INTERVAL: Duration = Duration::from_millis(100);
+
 const KONSUMER_OFFSETS_DATA_TOPIC: &'static str = "__consumer_offsets";
 
-/// Emits [`KonsumerOffsetsData`] via a provided [`broadcast::channel`].
+/// Emits [`KonsumerOffsetsData`] via a provided [`mpsc::channel`].
 ///
 /// It wraps a Kafka Client, consumes the `__consumer_offsets` topic, and emits its records
 /// parsed into [`KonsumerOffsetsData`].
@@ -47,13 +47,14 @@ impl KonsumerOffsetsDataEmitter {
     }
 }
 
-impl BroadcastEmitter for KonsumerOffsetsDataEmitter {
+#[async_trait]
+impl Emitter for KonsumerOffsetsDataEmitter {
     type Emitted = KonsumerOffsetsData;
 
     fn spawn(
         &self,
         mut shutdown_rx: broadcast::Receiver<()>,
-    ) -> (broadcast::Receiver<Self::Emitted>, JoinHandle<()>) {
+    ) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
         let config =
             Self::set_kafka_config(self.consumer_client_config.clone());
 
@@ -71,11 +72,9 @@ impl BroadcastEmitter for KonsumerOffsetsDataEmitter {
         //   2. Seek to that point for all topic/partition/offset triplets
         //   3. Begin consumption
 
-        let (sx, rx) = broadcast::channel::<KonsumerOffsetsData>(CHANNEL_SIZE);
+        let (sx, rx) = mpsc::channel::<KonsumerOffsetsData>(CHANNEL_SIZE);
 
         let join_handle = tokio::spawn(async move {
-            let mut interval = interval(POLL_INTERVAL);
-
             loop {
                 tokio::select! {
                     r_msg = consumer_client.recv() => {
@@ -85,13 +84,8 @@ impl BroadcastEmitter for KonsumerOffsetsDataEmitter {
 
                                 match res_kod {
                                     Ok(kod) => {
-                                        let ch_cap = CHANNEL_SIZE - sx.len();
-                                        if ch_cap == 0 {
-                                            warn!("Emitting channel saturated: receivers too slow?");
-                                        }
-
-                                        if let Err(e) = sx.send(kod) {
-                                            error!("Failed to emit KonsumerOffsetsData: {e}");
+                                        if let Err(e) = Self::emit(&sx, kod).await {
+                                            error!("Failed to emit {}: {e}", std::any::type_name::<KonsumerOffsetsData>());
                                         }
                                     }
                                     Err(e) => {
@@ -109,8 +103,6 @@ impl BroadcastEmitter for KonsumerOffsetsDataEmitter {
                         break;
                     }
                 }
-
-                interval.tick().await;
             }
         });
 
