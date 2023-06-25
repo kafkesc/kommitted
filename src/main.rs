@@ -17,7 +17,7 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 
 use cli::Cli;
-use internals::{BroadcastEmitter, Emitter};
+use internals::Emitter;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -56,11 +56,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         consumer_groups_emitter.spawn(shutdown_rx.resubscribe());
 
     // TODO / WIP: put in `lag_register` module
-    let _l_reg = lag_register::LagRegister::new(
-        cg_rx,
-        kod_rx.resubscribe(),
-        Arc::new(po_reg),
-    );
+    let _l_reg =
+        lag_register::LagRegister::new(cg_rx, kod_rx, Arc::new(po_reg));
 
     // Join all the async tasks, then let it terminate
     let _ = tokio::join!(cs_join, po_join, kod_join, cg_join);
