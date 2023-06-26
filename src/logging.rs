@@ -14,8 +14,7 @@ pub fn init(verbosity_level: i8) {
         3..=i8::MAX => log::Level::Trace.as_str(),
     };
 
-    let logger_env = env_logger::Env::default()
-        .filter_or(LOG_FILTER_ENV_VAR, default_log_level);
+    let logger_env = env_logger::Env::default().filter_or(LOG_FILTER_ENV_VAR, default_log_level);
     let mut logger_builder = env_logger::Builder::from_env(logger_env);
     logger_builder.init();
 

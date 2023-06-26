@@ -48,10 +48,7 @@ impl PartitionOffsetsEmitter {
     /// # Arguments
     ///
     /// * `client_config` - Kafka client configuration, used to fetch the Topic Partitions offset watermarks (earliest, latest)
-    pub fn new(
-        client_config: ClientConfig,
-        cluster_register: Arc<ClusterStatusRegister>,
-    ) -> Self {
+    pub fn new(client_config: ClientConfig, cluster_register: Arc<ClusterStatusRegister>) -> Self {
         Self {
             client_config,
             cluster_register,
@@ -63,14 +60,9 @@ impl PartitionOffsetsEmitter {
 impl Emitter for PartitionOffsetsEmitter {
     type Emitted = PartitionOffset;
 
-    fn spawn(
-        &self,
-        mut shutdown_rx: broadcast::Receiver<()>,
-    ) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
-        let admin_client: AdminClient<DefaultClientContext> = self
-            .client_config
-            .create()
-            .expect("Failed to allocate Admin Client");
+    fn spawn(&self, mut shutdown_rx: broadcast::Receiver<()>) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
+        let admin_client: AdminClient<DefaultClientContext> =
+            self.client_config.create().expect("Failed to allocate Admin Client");
 
         let (sx, rx) = mpsc::channel::<PartitionOffset>(CHANNEL_SIZE);
 
@@ -82,16 +74,8 @@ impl Emitter for PartitionOffsetsEmitter {
                 for t in csr.get_topics().await {
                     trace!("Fetching earliest/latest offset for Partitions of Topic '{}'", t);
 
-                    for p in csr
-                        .get_topic_partitions(t.as_str())
-                        .await
-                        .unwrap_or_default()
-                    {
-                        match admin_client.inner().fetch_watermarks(
-                            t.as_str(),
-                            p as i32,
-                            FETCH_TIMEOUT,
-                        ) {
+                    for p in csr.get_topic_partitions(t.as_str()).await.unwrap_or_default() {
+                        match admin_client.inner().fetch_watermarks(t.as_str(), p as i32, FETCH_TIMEOUT) {
                             Ok((earliest, latest)) => {
                                 let po = PartitionOffset {
                                     topic: t.clone(),

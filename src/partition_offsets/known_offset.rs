@@ -59,10 +59,7 @@ pub fn search(needle: u64, haystack: &[KnownOffset]) -> KnownOffsetSearchRes {
         } else if haystack[1].offset == needle {
             KnownOffsetSearchRes::Exact(haystack[1].clone())
         } else if haystack[0].offset < needle && needle < haystack[1].offset {
-            KnownOffsetSearchRes::Range(
-                haystack[0].clone(),
-                haystack[1].clone(),
-            )
+            KnownOffsetSearchRes::Range(haystack[0].clone(), haystack[1].clone())
         } else {
             KnownOffsetSearchRes::None
         };
@@ -81,10 +78,7 @@ pub fn search(needle: u64, haystack: &[KnownOffset]) -> KnownOffsetSearchRes {
         Ordering::Less => {
             if haystack[p - 1].offset < needle {
                 // `needle` not found: return the approximate range `[p-1, p]`
-                KnownOffsetSearchRes::Range(
-                    haystack[p - 1].clone(),
-                    haystack[p].clone(),
-                )
+                KnownOffsetSearchRes::Range(haystack[p - 1].clone(), haystack[p].clone())
             } else {
                 // Keep searching to the left of pivot
                 search(needle, &haystack[0..=p - 1])
@@ -93,10 +87,7 @@ pub fn search(needle: u64, haystack: &[KnownOffset]) -> KnownOffsetSearchRes {
         Ordering::Greater => {
             if needle < haystack[p + 1].offset {
                 // `needle` not found: return the approximate range `[p, p+1]`
-                KnownOffsetSearchRes::Range(
-                    haystack[p].clone(),
-                    haystack[p + 1].clone(),
-                )
+                KnownOffsetSearchRes::Range(haystack[p].clone(), haystack[p + 1].clone())
             } else {
                 // Keep searching to the right of pivot
                 search(needle, &haystack[p + 1..=r])

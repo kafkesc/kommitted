@@ -26,11 +26,8 @@ pub fn init(
     cluster_status_register: Arc<ClusterStatusRegister>,
     shutdown_rx: broadcast::Receiver<()>,
 ) -> (PartitionOffsetsRegister, JoinHandle<()>) {
-    let (po_rx, poe_join) = PartitionOffsetsEmitter::new(
-        admin_client_config,
-        cluster_status_register,
-    )
-    .spawn(shutdown_rx);
+    let (po_rx, poe_join) =
+        PartitionOffsetsEmitter::new(admin_client_config, cluster_status_register).spawn(shutdown_rx);
     let po_reg = PartitionOffsetsRegister::new(po_rx, register_offsets_history);
 
     debug!("Initialized");

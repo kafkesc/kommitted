@@ -40,12 +40,7 @@ impl Default for Lag {
 }
 
 impl Lag {
-    pub(crate) fn new(
-        offset: u64,
-        offset_timestamp: DateTime<Utc>,
-        offset_lag: u64,
-        time_lag: Duration,
-    ) -> Self {
+    pub(crate) fn new(offset: u64, offset_timestamp: DateTime<Utc>, offset_lag: u64, time_lag: Duration) -> Self {
         Self {
             offset,
             offset_timestamp,
@@ -110,11 +105,7 @@ impl LagRegister {
                     let r_guard = lag_by_group_clone.read().await;
                     debug!("Known Groups: {}", r_guard.len());
                     for (name, gwl) in r_guard.iter() {
-                        debug!(
-                            "Group {} has Lag info for {} partitions",
-                            name,
-                            gwl.lag_by_topic_partition.len()
-                        );
+                        debug!("Group {} has Lag info for {} partitions", name, gwl.lag_by_topic_partition.len());
                     }
                 }
             }
@@ -124,10 +115,7 @@ impl LagRegister {
     }
 }
 
-async fn process_consumer_groups(
-    cg: ConsumerGroups,
-    lag_register_groups: Arc<RwLock<HashMap<String, GroupWithLag>>>,
-) {
+async fn process_consumer_groups(cg: ConsumerGroups, lag_register_groups: Arc<RwLock<HashMap<String, GroupWithLag>>>) {
     for (group_name, group) in cg.groups.into_iter() {
         let mut w_guard = lag_register_groups.write().await;
 
@@ -140,7 +128,13 @@ async fn process_consumer_groups(
         } else {
             w_guard
                 .get_mut(&group_name)
-                .unwrap_or_else(|| panic!("{} for {:#?} could not be found: this should never happen!", std::any::type_name::<GroupWithLag>(), group_name))
+                .unwrap_or_else(|| {
+                    panic!(
+                        "{} for {:#?} could not be found: this should never happen!",
+                        std::any::type_name::<GroupWithLag>(),
+                        group_name
+                    )
+                })
                 .group = group;
         };
     }
@@ -159,32 +153,23 @@ async fn process_offset_commit(
             let l = Lag::new(
                 oc.offset as u64,
                 oc.commit_timestamp,
-                match po_reg
-                    .estimate_offset_lag(
-                        &tp.topic,
-                        tp.partition,
-                        oc.offset as u64,
-                    )
-                    .await
-                {
+                match po_reg.estimate_offset_lag(&tp.topic, tp.partition, oc.offset as u64).await {
                     Ok(ol) => ol,
                     Err(e) => {
-                        error!("Failed to estimate Offset Lag of Group '{}' for Topic Partition '{}:{}': {}", oc.group, tp.topic, tp.partition, e);
+                        error!(
+                            "Failed to estimate Offset Lag of Group '{}' for Topic Partition '{}:{}': {}",
+                            oc.group, tp.topic, tp.partition, e
+                        );
                         0
                     },
                 },
-                match po_reg
-                    .estimate_time_lag(
-                        &tp.topic,
-                        tp.partition,
-                        oc.offset as u64,
-                        oc.commit_timestamp,
-                    )
-                    .await
-                {
+                match po_reg.estimate_time_lag(&tp.topic, tp.partition, oc.offset as u64, oc.commit_timestamp).await {
                     Ok(tl) => tl,
                     Err(e) => {
-                        error!("Failed to estimate Time Lag of Group '{}' for Topic Partition '{}:{}': {}", oc.group, tp.topic, tp.partition, e);
+                        error!(
+                            "Failed to estimate Time Lag of Group '{}' for Topic Partition '{}:{}': {}",
+                            oc.group, tp.topic, tp.partition, e
+                        );
                         Duration::zero()
                     },
                 },
@@ -193,19 +178,12 @@ async fn process_offset_commit(
             gwl.lag_by_topic_partition.insert(tp, l);
         },
         None => {
-            warn!(
-                "Received {} about unknown Group '{}': ignoring",
-                std::any::type_name::<OffsetCommit>(),
-                oc.group
-            );
+            warn!("Received {} about unknown Group '{}': ignoring", std::any::type_name::<OffsetCommit>(), oc.group);
         },
     }
 }
 
-async fn process_group_metadata(
-    gm: GroupMetadata,
-    lag_register_groups: Arc<RwLock<HashMap<String, GroupWithLag>>>,
-) {
+async fn process_group_metadata(gm: GroupMetadata, lag_register_groups: Arc<RwLock<HashMap<String, GroupWithLag>>>) {
     let mut w_guard = lag_register_groups.write().await;
 
     match w_guard.get_mut(&gm.group) {
@@ -216,27 +194,20 @@ async fn process_group_metadata(
                 .into_iter()
                 .flat_map(|m| {
                     let mut tp_set = HashSet::with_capacity(
-                        m.assignment.assigned_topic_partitions.len()
-                            + m.subscription.owned_topic_partitions.len(),
+                        m.assignment.assigned_topic_partitions.len() + m.subscription.owned_topic_partitions.len(),
                     );
 
                     // Collect all Group Coordinator Assigned Topic Partitions
                     for assigned_tps in m.assignment.assigned_topic_partitions {
                         for tps in assigned_tps.partitions {
-                            tp_set.insert(TopicPartition::new(
-                                assigned_tps.topic.to_owned(),
-                                tps as u32,
-                            ));
+                            tp_set.insert(TopicPartition::new(assigned_tps.topic.to_owned(), tps as u32));
                         }
                     }
 
                     // Collect all Group Subscribed Topic Partitions
                     for owned_tps in m.subscription.owned_topic_partitions {
                         for tps in owned_tps.partitions {
-                            tp_set.insert(TopicPartition::new(
-                                owned_tps.topic.to_owned(),
-                                tps as u32,
-                            ));
+                            tp_set.insert(TopicPartition::new(owned_tps.topic.to_owned(), tps as u32));
                         }
                     }
 
@@ -251,11 +222,7 @@ async fn process_group_metadata(
             gwl.lag_by_topic_partition.retain(|tp, _| new_gtp_set.contains(tp));
         },
         None => {
-            warn!(
-                "Received {} about unknown Group '{}': ignoring",
-                std::any::type_name::<GroupMetadata>(),
-                gm.group
-            );
+            warn!("Received {} about unknown Group '{}': ignoring", std::any::type_name::<GroupMetadata>(), gm.group);
         },
     }
 }

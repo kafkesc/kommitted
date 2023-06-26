@@ -48,15 +48,10 @@ impl KonsumerOffsetsDataEmitter {
 impl Emitter for KonsumerOffsetsDataEmitter {
     type Emitted = KonsumerOffsetsData;
 
-    fn spawn(
-        &self,
-        mut shutdown_rx: broadcast::Receiver<()>,
-    ) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
-        let config =
-            Self::set_kafka_config(self.consumer_client_config.clone());
+    fn spawn(&self, mut shutdown_rx: broadcast::Receiver<()>) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
+        let config = Self::set_kafka_config(self.consumer_client_config.clone());
 
-        let consumer_client: StreamConsumer =
-            config.create().expect("Failed to create Consumer Client");
+        let consumer_client: StreamConsumer = config.create().expect("Failed to create Consumer Client");
 
         consumer_client
             .subscribe(&[KONSUMER_OFFSETS_DATA_TOPIC])

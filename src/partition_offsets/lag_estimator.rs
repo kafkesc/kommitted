@@ -48,36 +48,25 @@ impl PartitionLagEstimator {
     ///
     /// * `new_latest` - A new offset that should become the new latest known
     /// * `new_latest_datetime` - The [`DateTime<Utc>`] of the new offset
-    pub fn update(
-        &mut self,
-        new_latest: u64,
-        new_latest_datetime: DateTime<Utc>,
-    ) {
+    pub fn update(&mut self, new_latest: u64, new_latest_datetime: DateTime<Utc>) {
         // Validate the input, comparing to the latest known offset
         if let Some(curr_latest) = self.known.back() {
             if curr_latest.offset == new_latest {
                 // Ignore update if we already know this offset
-                trace!(
-                    "Update with offset {} already known: ignoring",
-                    curr_latest.offset
-                );
+                trace!("Update with offset {} already known: ignoring", curr_latest.offset);
                 return;
             } else if curr_latest.offset > new_latest {
                 // Unlikely scenario: ignore update if the offset precedes latest known
-                warn!("Update with offset {} that precedes current latest {}: ignoring",
-                    new_latest,
-                    curr_latest.offset
+                warn!(
+                    "Update with offset {} that precedes current latest {}: ignoring",
+                    new_latest, curr_latest.offset
                 );
                 return;
-            } else if curr_latest.offset < new_latest
-                && curr_latest.at > new_latest_datetime
-            {
+            } else if curr_latest.offset < new_latest && curr_latest.at > new_latest_datetime {
                 // Very unlikely scenario: ignore update if offset date-time precedes latest known
-                warn!("Update with offset {} of date-time '{}' that precedes current latest {} of '{}': ignoring",
-                    new_latest,
-                    new_latest_datetime,
-                    curr_latest.offset,
-                    curr_latest.at
+                warn!(
+                    "Update with offset {} of date-time '{}' that precedes current latest {} of '{}': ignoring",
+                    new_latest, new_latest_datetime, curr_latest.offset, curr_latest.at
                 );
                 return;
             }
@@ -111,15 +100,8 @@ impl PartitionLagEstimator {
     /// # Arguments
     ///
     /// * `offset` - Given offset we want to compare against the latest known offset
-    pub fn estimate_offset_lag(
-        &self,
-        offset: u64,
-    ) -> PartitionOffsetsResult<u64> {
-        let known_latest_offset = self
-            .known
-            .back()
-            .ok_or(PartitionOffsetsError::LagEstimatorNotReady)?
-            .offset;
+    pub fn estimate_offset_lag(&self, offset: u64) -> PartitionOffsetsResult<u64> {
+        let known_latest_offset = self.known.back().ok_or(PartitionOffsetsError::LagEstimatorNotReady)?.offset;
 
         // It's rare, but if we happen to receive a consumed offset that is ahead of the last
         // known end offset, we can just return `0` for lag.
@@ -142,11 +124,7 @@ impl PartitionLagEstimator {
     ///
     /// * `offset` - Given offset we want to compare against the latest known offset
     /// * `offset_datetime` - The [`DateTime<Utc>`] this offset was committed
-    pub fn estimate_time_lag(
-        &self,
-        offset: u64,
-        offset_datetime: DateTime<Utc>,
-    ) -> PartitionOffsetsResult<Duration> {
+    pub fn estimate_time_lag(&self, offset: u64, offset_datetime: DateTime<Utc>) -> PartitionOffsetsResult<Duration> {
         // NOTE: Please look up `VecDequeue::make_contiguous()` that we call every time we update
         // the internal collection, for this to make sense.
         //
@@ -160,26 +138,12 @@ impl PartitionLagEstimator {
         let estimated_produced_offset_datetime = match search_res {
             KnownOffsetSearchRes::Exact(found) => found.at,
             KnownOffsetSearchRes::Range(known_before, known_after) => {
-                interpolate_offset_to_datetime(
-                    &known_before,
-                    &known_after,
-                    offset,
-                )?
+                interpolate_offset_to_datetime(&known_before, &known_after, offset)?
             },
             KnownOffsetSearchRes::None => {
-                let earliest_known = self
-                    .known
-                    .front()
-                    .ok_or(PartitionOffsetsError::LagEstimatorNotReady)?;
-                let latest_known = self
-                    .known
-                    .back()
-                    .ok_or(PartitionOffsetsError::LagEstimatorNotReady)?;
-                interpolate_offset_to_datetime(
-                    earliest_known,
-                    latest_known,
-                    offset,
-                )?
+                let earliest_known = self.known.front().ok_or(PartitionOffsetsError::LagEstimatorNotReady)?;
+                let latest_known = self.known.back().ok_or(PartitionOffsetsError::LagEstimatorNotReady)?;
+                interpolate_offset_to_datetime(earliest_known, latest_known, offset)?
             },
         };
 
@@ -248,9 +212,8 @@ fn interpolate_offset_to_datetime(
 /// * `utc_timestamp_ms` - Amount of milliseconds since UTC Epoch.
 fn utc_from_ms(utc_timestamp_ms: i64) -> PartitionOffsetsResult<DateTime<Utc>> {
     Ok(DateTime::<Utc>::from_utc(
-        NaiveDateTime::from_timestamp_millis(utc_timestamp_ms).ok_or(
-            PartitionOffsetsError::UtcTimestampMillisInvalid(utc_timestamp_ms),
-        )?,
+        NaiveDateTime::from_timestamp_millis(utc_timestamp_ms)
+            .ok_or(PartitionOffsetsError::UtcTimestampMillisInvalid(utc_timestamp_ms))?,
         Utc,
     ))
 }
@@ -258,9 +221,7 @@ fn utc_from_ms(utc_timestamp_ms: i64) -> PartitionOffsetsResult<DateTime<Utc>> {
 #[cfg(test)]
 mod test {
     use crate::partition_offsets::known_offset::KnownOffset;
-    use crate::partition_offsets::lag_estimator::{
-        interpolate_offset_to_datetime, utc_from_ms, PartitionLagEstimator,
-    };
+    use crate::partition_offsets::lag_estimator::{interpolate_offset_to_datetime, utc_from_ms, PartitionLagEstimator};
     use chrono::Duration;
 
     fn example_known_offsets() -> (Vec<u64>, Vec<i64>) {
@@ -296,9 +257,7 @@ mod test {
         let mut prev = off[0];
         let mut curr;
         for (idx, offset) in off[1..].iter().enumerate() {
-            curr = interpolate_offset_to_datetime(&p1, &p2, *offset)
-                .unwrap()
-                .timestamp_millis();
+            curr = interpolate_offset_to_datetime(&p1, &p2, *offset).unwrap().timestamp_millis();
 
             assert!(prev < curr as u64);
             assert_eq!(ts[idx + 1], curr);
@@ -357,23 +316,19 @@ mod test {
         }
 
         assert_eq!(
-            estimator
-                .estimate_time_lag(800, utc_from_ms(1677706399068).unwrap()),
+            estimator.estimate_time_lag(800, utc_from_ms(1677706399068).unwrap()),
             Ok(Duration::nanoseconds(653148000000))
         );
         assert_eq!(
-            estimator
-                .estimate_time_lag(1346, utc_from_ms(1677706286068).unwrap()),
+            estimator.estimate_time_lag(1346, utc_from_ms(1677706286068).unwrap()),
             Ok(Duration::milliseconds(0))
         );
         assert_eq!(
-            estimator
-                .estimate_time_lag(1446, utc_from_ms(1677706399068).unwrap()),
+            estimator.estimate_time_lag(1446, utc_from_ms(1677706399068).unwrap()),
             Ok(Duration::nanoseconds(14071000000))
         );
         assert_eq!(
-            estimator
-                .estimate_time_lag(1500, utc_from_ms(1677706438418).unwrap()),
+            estimator.estimate_time_lag(1500, utc_from_ms(1677706438418).unwrap()),
             Ok(Duration::nanoseconds(0))
         );
     }
@@ -391,18 +346,9 @@ mod test {
 
         // Estimate on and inside the first 2: the lag is predictable,
         // by looking at the data we just entered above for offset `5` and `10`
-        assert_eq!(
-            estimator.estimate_time_lag(5, utc_from_ms(11).unwrap()),
-            Ok(Duration::nanoseconds(1000000))
-        );
-        assert_eq!(
-            estimator.estimate_time_lag(7, utc_from_ms(16).unwrap()),
-            Ok(Duration::nanoseconds(2000000))
-        );
-        assert_eq!(
-            estimator.estimate_time_lag(10, utc_from_ms(23).unwrap()),
-            Ok(Duration::nanoseconds(3000000))
-        );
+        assert_eq!(estimator.estimate_time_lag(5, utc_from_ms(11).unwrap()), Ok(Duration::nanoseconds(1000000)));
+        assert_eq!(estimator.estimate_time_lag(7, utc_from_ms(16).unwrap()), Ok(Duration::nanoseconds(2000000)));
+        assert_eq!(estimator.estimate_time_lag(10, utc_from_ms(23).unwrap()), Ok(Duration::nanoseconds(3000000)));
 
         // Add 2 more: this should push the first 2 (offsets `5` and `10` off the internal queue)
         estimator.update(39, utc_from_ms(73).unwrap());
@@ -411,17 +357,8 @@ mod test {
         // Estimation increases for the same point we evaluated above:
         // this happens because the remaining points lead to a interpolation that moves the estimated
         // line for discarded points, a bit back on the x-axis of time.
-        assert_eq!(
-            estimator.estimate_time_lag(5, utc_from_ms(11).unwrap()),
-            Ok(Duration::nanoseconds(6000000))
-        );
-        assert_eq!(
-            estimator.estimate_time_lag(7, utc_from_ms(16).unwrap()),
-            Ok(Duration::nanoseconds(7000000))
-        );
-        assert_eq!(
-            estimator.estimate_time_lag(10, utc_from_ms(23).unwrap()),
-            Ok(Duration::nanoseconds(7000000))
-        );
+        assert_eq!(estimator.estimate_time_lag(5, utc_from_ms(11).unwrap()), Ok(Duration::nanoseconds(6000000)));
+        assert_eq!(estimator.estimate_time_lag(7, utc_from_ms(16).unwrap()), Ok(Duration::nanoseconds(7000000)));
+        assert_eq!(estimator.estimate_time_lag(10, utc_from_ms(23).unwrap()), Ok(Duration::nanoseconds(7000000)));
     }
 }

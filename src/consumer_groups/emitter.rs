@@ -1,10 +1,7 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use rdkafka::{
-    admin::AdminClient, client::DefaultClientContext, groups::GroupList,
-    ClientConfig,
-};
+use rdkafka::{admin::AdminClient, client::DefaultClientContext, groups::GroupList, ClientConfig};
 use tokio::{
     sync::{broadcast, mpsc},
     task::JoinHandle,
@@ -90,14 +87,9 @@ impl ConsumerGroupsEmitter {
 impl Emitter for ConsumerGroupsEmitter {
     type Emitted = ConsumerGroups;
 
-    fn spawn(
-        &self,
-        mut shutdown_rx: broadcast::Receiver<()>,
-    ) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
-        let admin_client: AdminClient<DefaultClientContext> = self
-            .admin_client_config
-            .create()
-            .expect("Failed to allocate Admin Client");
+    fn spawn(&self, mut shutdown_rx: broadcast::Receiver<()>) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
+        let admin_client: AdminClient<DefaultClientContext> =
+            self.admin_client_config.create().expect("Failed to allocate Admin Client");
 
         let (sx, rx) = mpsc::channel::<Self::Emitted>(CHANNEL_SIZE);
 
@@ -105,10 +97,7 @@ impl Emitter for ConsumerGroupsEmitter {
             let mut interval = interval(FETCH_INTERVAL);
 
             'outer: loop {
-                let res_groups = admin_client
-                    .inner()
-                    .fetch_group_list(None, FETCH_TIMEOUT)
-                    .map(Self::Emitted::from);
+                let res_groups = admin_client.inner().fetch_group_list(None, FETCH_TIMEOUT).map(Self::Emitted::from);
 
                 match res_groups {
                     Ok(groups) => {

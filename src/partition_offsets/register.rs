@@ -33,10 +33,7 @@ impl PartitionOffsetsRegister {
     ///   History for each (`Topic, Partition`) pair is kept in a queue-like structure of this
     ///   size. Each entry in the structure is the pair (`Offset, UTC TS`): each pair represents
     ///   at what moment in time that particular offset was valid.
-    pub fn new(
-        mut rx: Receiver<PartitionOffset>,
-        offsets_history: usize,
-    ) -> Self {
+    pub fn new(mut rx: Receiver<PartitionOffset>, offsets_history: usize) -> Self {
         let por = Self {
             estimators: Arc::new(RwLock::new(HashMap::new())),
         };
@@ -118,10 +115,7 @@ impl PartitionOffsetsRegister {
             .read()
             .await
             .get(&k)
-            .ok_or(PartitionOffsetsError::LagEstimatorNotFound(
-                topic.to_string(),
-                partition,
-            ))?
+            .ok_or(PartitionOffsetsError::LagEstimatorNotFound(topic.to_string(), partition))?
             .read()
             .await
             .estimate_offset_lag(consumed_offset)
@@ -151,10 +145,7 @@ impl PartitionOffsetsRegister {
             .read()
             .await
             .get(&k)
-            .ok_or(PartitionOffsetsError::LagEstimatorNotFound(
-                topic.to_string(),
-                partition,
-            ))?
+            .ok_or(PartitionOffsetsError::LagEstimatorNotFound(topic.to_string(), partition))?
             .read()
             .await
             .estimate_time_lag(consumed_offset, consumed_offset_datetime)
@@ -166,11 +157,7 @@ impl PartitionOffsetsRegister {
     ///
     /// * `topic` - Topic
     /// * `partition` - Partition pf the Topic
-    pub async fn contains_topic_partition(
-        &self,
-        topic: &str,
-        partition: u32,
-    ) -> bool {
+    pub async fn contains_topic_partition(&self, topic: &str, partition: u32) -> bool {
         let k = TopicPartition {
             topic: topic.to_string(),
             partition,

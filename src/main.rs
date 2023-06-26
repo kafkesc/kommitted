@@ -27,10 +27,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let shutdown_rx = build_shutdown_channel();
 
     // Init `cluster_status` module
-    let (cs_reg, cs_join) = cluster_status::init(
-        admin_client_config.clone(),
-        shutdown_rx.resubscribe(),
-    );
+    let (cs_reg, cs_join) = cluster_status::init(admin_client_config.clone(), shutdown_rx.resubscribe());
 
     // Init `partition_offsets` module
     let (po_reg, po_join) = partition_offsets::init(
@@ -42,22 +39,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // TODO / WIP: put in `konsumer_offsets_data` module
     let konsumer_offsets_data_emitter =
-        konsumer_offsets_data::KonsumerOffsetsDataEmitter::new(
-            admin_client_config.clone(),
-        );
-    let (kod_rx, kod_join) =
-        konsumer_offsets_data_emitter.spawn(shutdown_rx.resubscribe());
+        konsumer_offsets_data::KonsumerOffsetsDataEmitter::new(admin_client_config.clone());
+    let (kod_rx, kod_join) = konsumer_offsets_data_emitter.spawn(shutdown_rx.resubscribe());
 
     // TODO / WIP: put in `consumer_groups` module
-    let consumer_groups_emitter = consumer_groups::ConsumerGroupsEmitter::new(
-        admin_client_config.clone(),
-    );
-    let (cg_rx, cg_join) =
-        consumer_groups_emitter.spawn(shutdown_rx.resubscribe());
+    let consumer_groups_emitter = consumer_groups::ConsumerGroupsEmitter::new(admin_client_config.clone());
+    let (cg_rx, cg_join) = consumer_groups_emitter.spawn(shutdown_rx.resubscribe());
 
     // TODO / WIP: put in `lag_register` module
-    let _l_reg =
-        lag_register::LagRegister::new(cg_rx, kod_rx, Arc::new(po_reg));
+    let _l_reg = lag_register::LagRegister::new(cg_rx, kod_rx, Arc::new(po_reg));
 
     // Join all the async tasks, then let it terminate
     let _ = tokio::join!(cs_join, po_join, kod_join, cg_join);

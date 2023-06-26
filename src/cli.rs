@@ -44,12 +44,7 @@ pub struct Cli {
     /// Offsets data points are collected _at best every second_.
     /// Once this limit is reached, the oldest data points are discarded, realising
     /// a "moving window" of offsets history.
-    #[arg(
-        long = "history",
-        value_name = "SIZE",
-        default_value = "3600",
-        verbatim_doc_comment
-    )]
+    #[arg(long = "history", value_name = "SIZE", default_value = "3600", verbatim_doc_comment)]
     pub offsets_history: usize,
 
     /// Verbose logging.
@@ -86,9 +81,7 @@ impl Cli {
 
     pub fn build_client_config(&self) -> ClientConfig {
         let mut config = ClientConfig::new();
-        config
-            .set("bootstrap.servers", self.bootstrap_brokers.clone())
-            .set("client.id", self.client_id.clone());
+        config.set("bootstrap.servers", self.bootstrap_brokers.clone()).set("client.id", self.client_id.clone());
         for cfg in &self.kafka_config {
             config.set(cfg.0.clone(), cfg.1.clone());
         }
