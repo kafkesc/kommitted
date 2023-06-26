@@ -157,6 +157,7 @@ impl PartitionOffsetsRegister {
     ///
     /// * `topic` - Topic
     /// * `partition` - Partition pf the Topic
+    #[allow(dead_code)]
     pub async fn contains_topic_partition(&self, topic: &str, partition: u32) -> bool {
         let k = TopicPartition {
             topic: topic.to_string(),
@@ -167,6 +168,7 @@ impl PartitionOffsetsRegister {
     }
 
     /// Get all the `(topic, partition)` tuples it contains.
+    #[allow(dead_code)]
     pub async fn get_topic_partitions(&self) -> HashSet<TopicPartition> {
         HashSet::from_iter(self.estimators.read().await.keys().cloned())
     }
