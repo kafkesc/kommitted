@@ -45,14 +45,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         konsumer_offsets_data::KonsumerOffsetsDataEmitter::new(
             admin_client_config.clone(),
         );
-    let (mut kod_rx, kod_join) =
+    let (kod_rx, kod_join) =
         konsumer_offsets_data_emitter.spawn(shutdown_rx.resubscribe());
 
     // TODO / WIP: put in `consumer_groups` module
     let consumer_groups_emitter = consumer_groups::ConsumerGroupsEmitter::new(
         admin_client_config.clone(),
     );
-    let (mut cg_rx, cg_join) =
+    let (cg_rx, cg_join) =
         consumer_groups_emitter.spawn(shutdown_rx.resubscribe());
 
     // TODO / WIP: put in `lag_register` module

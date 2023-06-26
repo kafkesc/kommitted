@@ -78,7 +78,7 @@ impl PartitionOffsetsRegister {
                         w_guard
                             .downgrade() //< Here the exclusive write lock, becomes a read lock
                             .get(&k)
-                            .expect(format!("PartitionLagEstimator for {:#?} could not be found: this should never happen!", k).as_str())
+                            .unwrap_or_else(|| panic!("{} for {:#?} could not be found: this should never happen!", std::any::type_name::<PartitionLagEstimator>(), k))
                             .write()
                             .await
                             .update(po.latest_offset, po.read_datetime);

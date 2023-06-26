@@ -1,12 +1,12 @@
-use std::collections::{HashMap, HashSet};
-use std::ops::Sub;
-use std::sync::Arc;
+use std::{
+    collections::{hash_map::Entry, HashMap, HashSet},
+    sync::Arc,
+};
 
 use chrono::{DateTime, Duration, Utc};
 use konsumer_offsets::{GroupMetadata, KonsumerOffsetsData, OffsetCommit};
 use log::Level::Debug;
-use rdkafka::bindings::rd_kafka_destroy_flags;
-use tokio::sync::{broadcast, mpsc, RwLock};
+use tokio::sync::{mpsc, RwLock};
 
 use crate::consumer_groups::ConsumerGroups;
 use crate::kafka_types::{Group, TopicPartition};
@@ -31,8 +31,10 @@ pub struct Lag {
 impl Default for Lag {
     fn default() -> Self {
         Lag {
+            offset: 0,
+            offset_timestamp: DateTime::<Utc>::default(),
+            offset_lag: 0,
             time_lag: Duration::zero(),
-            ..Default::default()
         }
     }
 }
@@ -130,18 +132,15 @@ async fn process_consumer_groups(
         let mut w_guard = lag_register_groups.write().await;
 
         // Insert or update "group name -> group with lag" map entries
-        if !w_guard.contains_key(&group_name) {
-            w_guard.insert(
-                group_name,
-                GroupWithLag {
-                    group,
-                    ..Default::default()
-                },
-            );
+        if let Entry::Vacant(e) = w_guard.entry(group_name.clone()) {
+            e.insert(GroupWithLag {
+                group,
+                ..Default::default()
+            });
         } else {
             w_guard
                 .get_mut(&group_name)
-                .expect(format!("{} for {:#?} could not be found: this should never happen!", std::any::type_name::<GroupWithLag>(), group_name).as_str())
+                .unwrap_or_else(|| panic!("{} for {:#?} could not be found: this should never happen!", std::any::type_name::<GroupWithLag>(), group_name))
                 .group = group;
         };
     }
@@ -215,7 +214,7 @@ async fn process_group_metadata(
             let new_gtp_set = gm
                 .members
                 .into_iter()
-                .map(|m| {
+                .flat_map(|m| {
                     let mut tp_set = HashSet::with_capacity(
                         m.assignment.assigned_topic_partitions.len()
                             + m.subscription.owned_topic_partitions.len(),
@@ -243,14 +242,13 @@ async fn process_group_metadata(
 
                     tp_set
                 })
-                .flatten()
                 .collect::<HashSet<TopicPartition>>();
 
             // Keep a Topic-Partition Lag for this Group, only if it was in the GroupMetadata.
             //
             // NOTE: The new ones that are NOT YET in the map, will be added when an
             // OffsetCommit for this Group and this Topic-Partition is received and Lag calculated.
-            gwl.lag_by_topic_partition.retain(|tp, l| new_gtp_set.contains(tp));
+            gwl.lag_by_topic_partition.retain(|tp, _| new_gtp_set.contains(tp));
         },
         None => {
             warn!(

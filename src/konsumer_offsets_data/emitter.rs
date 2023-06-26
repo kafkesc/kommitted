@@ -1,9 +1,6 @@
 use async_trait::async_trait;
 use rdkafka::{
-    admin::AdminClient,
-    client::DefaultClientContext,
     consumer::{Consumer, StreamConsumer},
-    groups::GroupList,
     ClientConfig, Message,
 };
 use tokio::{
@@ -17,7 +14,7 @@ use crate::internals::Emitter;
 
 const CHANNEL_SIZE: usize = 1000;
 
-const KONSUMER_OFFSETS_DATA_TOPIC: &'static str = "__consumer_offsets";
+const KONSUMER_OFFSETS_DATA_TOPIC: &str = "__consumer_offsets";
 
 /// Emits [`KonsumerOffsetsData`] via a provided [`mpsc::channel`].
 ///
@@ -61,10 +58,9 @@ impl Emitter for KonsumerOffsetsDataEmitter {
         let consumer_client: StreamConsumer =
             config.create().expect("Failed to create Consumer Client");
 
-        consumer_client.subscribe(&[KONSUMER_OFFSETS_DATA_TOPIC]).expect(
-            format!("Failed to subscribe to '{}'", KONSUMER_OFFSETS_DATA_TOPIC)
-                .as_str(),
-        );
+        consumer_client
+            .subscribe(&[KONSUMER_OFFSETS_DATA_TOPIC])
+            .unwrap_or_else(|_| panic!("Failed to subscribe to '{}'", KONSUMER_OFFSETS_DATA_TOPIC));
 
         // TODO
         //   1. Define configuration/logic to start the read of the topic from "earliest" or

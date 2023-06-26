@@ -8,7 +8,7 @@ use rdkafka::{
 use tokio::{
     sync::{broadcast, mpsc},
     task::JoinHandle,
-    time::{interval, Duration, Interval},
+    time::{interval, Duration},
 };
 
 use crate::internals::Emitter;
