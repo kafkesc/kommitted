@@ -1,10 +1,8 @@
 use clap::{ArgGroup, Parser};
 use rdkafka::ClientConfig;
 
-// Follows the list of arguments we need to start with:
-//
-// TODO doc
-//
+/// Command Line Interface, defined via the declarative,
+/// `derive` based functionality of the `clap` crate.
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 #[command(group(
