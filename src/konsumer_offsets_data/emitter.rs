@@ -10,8 +10,8 @@ use tokio::{
 
 use konsumer_offsets::KonsumerOffsetsData;
 
-use crate::internals::Emitter;
 use crate::constants::{KONSUMER_OFFSETS_DATA_TOPIC, KONSUMER_OFFSETS_KCL_CONSUMER};
+use crate::internals::Emitter;
 
 const CHANNEL_SIZE: usize = 1000;
 

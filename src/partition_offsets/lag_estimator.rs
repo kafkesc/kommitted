@@ -125,6 +125,13 @@ impl PartitionLagEstimator {
     /// * `offset` - Given offset we want to compare against the latest known offset
     /// * `offset_datetime` - The [`DateTime<Utc>`] this offset was committed
     pub fn estimate_time_lag(&self, offset: u64, offset_datetime: DateTime<Utc>) -> PartitionOffsetsResult<Duration> {
+        // It's rare, but if we happen to receive a consumed offset that is ahead of the last
+        // known end offset, we can just return a Duration of `0` for time lag.
+        let known_latest_offset = self.latest_offset()?.offset;
+        if offset > known_latest_offset {
+            return Ok(Duration::zero());
+        }
+
         // NOTE: Please look up `VecDequeue::make_contiguous()` that we call every time we update
         // the internal collection, for this to make sense.
         //
