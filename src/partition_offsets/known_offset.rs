@@ -6,14 +6,14 @@ use chrono::{DateTime, Utc};
 ///
 /// This is used to represent concepts like
 /// "the timestamp at which a Topic Partition offset was produced".
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct KnownOffset {
     pub offset: u64,
     pub at: DateTime<Utc>,
 }
 
 /// Result of a call to [`search`].
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum KnownOffsetSearchRes {
     /// Offset found, it was part of the search input.
     Exact(KnownOffset),

@@ -15,6 +15,7 @@ use crate::internals::Emitter;
 const CHANNEL_SIZE: usize = 1000;
 
 const KONSUMER_OFFSETS_DATA_TOPIC: &str = "__consumer_offsets";
+const KONSUMER_OFFSETS_CONSUMER: &str = "__kcl__consumer_offsets_consumer";
 
 /// Emits [`KonsumerOffsetsData`] via a provided [`mpsc::channel`].
 ///
@@ -37,7 +38,7 @@ impl KonsumerOffsetsDataEmitter {
         client_config.set("enable.auto.commit", "true");
         client_config.set("auto.offset.reset", "earliest");
         if client_config.get("group.id").is_none() {
-            client_config.set("group.id", std::any::type_name::<Self>());
+            client_config.set("group.id", KONSUMER_OFFSETS_CONSUMER);
         }
 
         client_config

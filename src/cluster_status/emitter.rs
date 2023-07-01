@@ -15,7 +15,7 @@ const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 const FETCH_INTERVAL: Duration = Duration::from_secs(60);
 
 /// This is a `Send`-able struct to carry Kafka Cluster status across thread boundaries.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct ClusterStatus {
     /// A vector of [`TopicPartitionsStatus`].
     ///

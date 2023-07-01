@@ -18,7 +18,7 @@ const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 const FETCH_INTERVAL: Duration = Duration::from_millis(200);
 
 /// Offset information for a Topic Partition.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct PartitionOffset {
     /// Topic of the Partition
     pub topic: String,
