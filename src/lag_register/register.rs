@@ -8,6 +8,7 @@ use konsumer_offsets::{GroupMetadata, KonsumerOffsetsData, OffsetCommit};
 use log::Level::{Debug, Trace};
 use tokio::sync::{mpsc, RwLock};
 
+use crate::constants::KONSUMER_OFFSETS_KCL_CONSUMER;
 use crate::consumer_groups::ConsumerGroups;
 use crate::kafka_types::{Group, Member, TopicPartition};
 use crate::partition_offsets::{KnownOffset, PartitionOffsetsRegister};
@@ -127,6 +128,11 @@ impl LagRegister {
 
 async fn process_consumer_groups(cg: ConsumerGroups, lag_register_groups: Arc<RwLock<HashMap<String, GroupWithLag>>>) {
     for (group_name, group_with_members) in cg.groups.into_iter() {
+        // Ignore own consumer of `__consumer_offsets` topic.
+        if group_name == KONSUMER_OFFSETS_KCL_CONSUMER {
+            continue;
+        }
+
         let mut w_guard = lag_register_groups.write().await;
 
         // Organise all the Group Members by the TopicPartition they own
@@ -194,6 +200,11 @@ async fn process_offset_commit(
     lag_register_groups: Arc<RwLock<HashMap<String, GroupWithLag>>>,
     po_reg: Arc<PartitionOffsetsRegister>,
 ) {
+    // Ignore own consumer of `__consumer_offsets` topic.
+    if oc.group == KONSUMER_OFFSETS_KCL_CONSUMER {
+        return;
+    }
+
     let mut w_guard = lag_register_groups.write().await;
 
     match w_guard.get_mut(&oc.group) {
@@ -260,6 +271,11 @@ async fn process_offset_commit(
 }
 
 async fn process_group_metadata(gm: GroupMetadata, lag_register_groups: Arc<RwLock<HashMap<String, GroupWithLag>>>) {
+    // Ignore own consumer of `__consumer_offsets` topic.
+    if gm.group == KONSUMER_OFFSETS_KCL_CONSUMER {
+        return;
+    }
+
     let mut w_guard = lag_register_groups.write().await;
 
     match w_guard.get_mut(&gm.group) {

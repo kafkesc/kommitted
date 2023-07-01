@@ -9,6 +9,7 @@ use tokio::{
     time::{interval, Duration},
 };
 
+use crate::constants::KONSUMER_OFFSETS_KCL_CONSUMER;
 use crate::internals::Emitter;
 use crate::kafka_types::{Group, GroupWithMembers, Member, MemberWithAssignment, TopicPartition};
 
@@ -32,6 +33,11 @@ impl From<GroupList> for ConsumerGroups {
         };
 
         for g in gl.groups() {
+            // Ignore own consumer of `__consumer_offsets` topic.
+            if g.name() == KONSUMER_OFFSETS_KCL_CONSUMER {
+                continue;
+            }
+
             let mut res_members = HashMap::with_capacity(g.members().len());
 
             for m in g.members() {

@@ -11,11 +11,9 @@ use tokio::{
 use konsumer_offsets::KonsumerOffsetsData;
 
 use crate::internals::Emitter;
+use crate::constants::{KONSUMER_OFFSETS_DATA_TOPIC, KONSUMER_OFFSETS_KCL_CONSUMER};
 
 const CHANNEL_SIZE: usize = 1000;
-
-const KONSUMER_OFFSETS_DATA_TOPIC: &str = "__consumer_offsets";
-const KONSUMER_OFFSETS_CONSUMER: &str = "__kcl__consumer_offsets_consumer";
 
 /// Emits [`KonsumerOffsetsData`] via a provided [`mpsc::channel`].
 ///
@@ -38,7 +36,7 @@ impl KonsumerOffsetsDataEmitter {
         client_config.set("enable.auto.commit", "true");
         client_config.set("auto.offset.reset", "earliest");
         if client_config.get("group.id").is_none() {
-            client_config.set("group.id", KONSUMER_OFFSETS_CONSUMER);
+            client_config.set("group.id", KONSUMER_OFFSETS_KCL_CONSUMER);
         }
 
         client_config
