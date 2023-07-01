@@ -8,7 +8,7 @@ mod group;
 mod topic_partition;
 mod topic_partitions_status;
 
-pub use broker::Broker;
-pub use group::{Group, Member};
-pub use topic_partition::TopicPartition;
-pub use topic_partitions_status::{PartitionStatus, TopicPartitionsStatus};
+pub use broker::*;
+pub use group::*;
+pub use topic_partition::*;
+pub use topic_partitions_status::*;
