@@ -150,18 +150,33 @@ impl PartitionLagEstimator {
             KnownOffsetSearchRes::None => {
                 let earliest_known = self.earliest_offset()?;
                 let latest_known = self.latest_offset()?;
-                interpolate_offset_to_datetime(earliest_known, latest_known, offset)?
+                let second_latest_known = self.nth_latest_offset(2)?;
+
+                // Estimate production time, considering widest range possible: earliest and latest known
+                let widest_estimate = interpolate_offset_to_datetime(earliest_known, latest_known, offset)?;
+
+                // Estimate production time, considering narrowest range possible: 2nd-latest and latest known
+                let narrowest_estimate = interpolate_offset_to_datetime(second_latest_known, latest_known, offset)?;
+
+                // Return the average of the 2 estimates
+                if widest_estimate < narrowest_estimate {
+                    widest_estimate + (narrowest_estimate - widest_estimate)
+                } else {
+                    narrowest_estimate + (widest_estimate - narrowest_estimate)
+                }
             },
         };
 
-        // It's rare, but if we happen to receive a consumed offset datetime that is behind
-        // of the estimated end offset datetime, we produce an error: it's simply not possible
-        // for an offset to be consumed before it's produced.
+        // It's infrequent, but when we receive a consumed offset datetime that is AHEAD
+        // of the estimated production datetime, we return zero.
+        //
+        // While it's not possible for an offset to be consumed before it's produced (obviously),
+        // it can happen that the linear interpolation done above, estimates the production time
+        // to be later then it ACTUALLY was.
+        //
+        // When that happen, is perfectly ok to consider the time lag to be EFFECTIVELY zero.
         if offset_datetime < estimated_produced_offset_datetime {
-            Err(PartitionOffsetsError::ConsumedAheadOfProducedOffsetDatetime(
-                offset_datetime,
-                estimated_produced_offset_datetime,
-            ))
+            Ok(Duration::zero())
         } else {
             Ok(offset_datetime - estimated_produced_offset_datetime)
         }
@@ -173,6 +188,14 @@ impl PartitionLagEstimator {
         self.known.capacity() - self.known.len()
     }
 
+    /// Given the constructor-time `capacity`, at how much usage percent is it, before
+    /// a new [`PartitionLagEstimator::update()`] call will need to drop the earliest known?
+    ///
+    /// This is useful to assess how "full" is the `PartitionLagEstimator`.
+    pub fn usage_percent(&self) -> f64 {
+        self.known.len() as f64 / self.known.capacity() as f64 * 100_f64
+    }
+
     /// Get a reference to the earliest [`KnownOffset`].
     pub fn earliest_offset(&self) -> PartitionOffsetsResult<&KnownOffset> {
         self.known.front().ok_or(PartitionOffsetsError::LagEstimatorNotReady)
@@ -181,6 +204,11 @@ impl PartitionLagEstimator {
     /// Get a reference to the latest [`KnownOffset`]
     pub fn latest_offset(&self) -> PartitionOffsetsResult<&KnownOffset> {
         self.known.back().ok_or(PartitionOffsetsError::LagEstimatorNotReady)
+    }
+
+    /// Get a reference to the Nth latest [`KnownOffset`]
+    pub fn nth_latest_offset(&self, pos: usize) -> PartitionOffsetsResult<&KnownOffset> {
+        self.known.get(self.known.len().wrapping_sub(pos)).ok_or(PartitionOffsetsError::LagEstimatorNotReady)
     }
 }
 
@@ -288,7 +316,7 @@ mod test {
         let (off, ts) = example_known_offsets();
 
         // Setup estimator with example input
-        let mut estimator = PartitionLagEstimator::new(100);
+        let mut estimator = PartitionLagEstimator::new(10);
         for (idx, offset) in off.iter().enumerate() {
             estimator.update(*offset, utc_from_ms(ts[idx]).unwrap());
         }
@@ -327,7 +355,7 @@ mod test {
         let (off, ts) = example_known_offsets();
 
         // Setup estimator with example input
-        let mut estimator = PartitionLagEstimator::new(100);
+        let mut estimator = PartitionLagEstimator::new(10);
         for (idx, offset) in off.iter().enumerate() {
             estimator.update(*offset, utc_from_ms(ts[idx]).unwrap());
         }
@@ -377,5 +405,32 @@ mod test {
         assert_eq!(estimator.estimate_time_lag(5, utc_from_ms(11).unwrap()), Ok(Duration::nanoseconds(6000000)));
         assert_eq!(estimator.estimate_time_lag(7, utc_from_ms(16).unwrap()), Ok(Duration::nanoseconds(7000000)));
         assert_eq!(estimator.estimate_time_lag(10, utc_from_ms(23).unwrap()), Ok(Duration::nanoseconds(7000000)));
+    }
+
+    #[test]
+    fn use_percent() {
+        let (off, ts) = example_known_offsets();
+
+        let mut estimator = PartitionLagEstimator::new(10);
+
+        // Check how usage percent grows along the way, but remains below 100% (extra capacity available)
+        assert_eq!(estimator.usage_percent(), 0_f64);
+        for (idx, offset) in off.iter().enumerate() {
+            assert_eq!(estimator.usage_percent(), idx as f64 * 10_f64);
+            estimator.update(*offset, utc_from_ms(ts[idx]).unwrap());
+            assert_eq!(estimator.usage_percent(), (idx + 1) as f64 * 10_f64);
+        }
+        assert_eq!(estimator.usage_percent(), 80_f64);
+
+        let mut estimator = PartitionLagEstimator::new(5);
+
+        // Check how usage percent grows along the way, but reaches and stays at 100% (no extra capacity available)
+        assert_eq!(estimator.usage_percent(), 0_f64);
+        for (idx, offset) in off.iter().enumerate() {
+            assert_eq!(estimator.usage_percent(), ((idx) as f64 * 20_f64).min(100_f64));
+            estimator.update(*offset, utc_from_ms(ts[idx]).unwrap());
+            assert_eq!(estimator.usage_percent(), ((idx + 1) as f64 * 20_f64).min(100_f64));
+        }
+        assert_eq!(estimator.usage_percent(), 100_f64);
     }
 }
