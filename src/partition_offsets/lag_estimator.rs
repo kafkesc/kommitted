@@ -101,7 +101,7 @@ impl PartitionLagEstimator {
     ///
     /// * `offset` - Given offset we want to compare against the latest known offset
     pub fn estimate_offset_lag(&self, offset: u64) -> PartitionOffsetsResult<u64> {
-        let known_latest_offset = self.known.back().ok_or(PartitionOffsetsError::LagEstimatorNotReady)?.offset;
+        let known_latest_offset = self.latest_offset()?.offset;
 
         // It's rare, but if we happen to receive a consumed offset that is ahead of the last
         // known end offset, we can just return `0` for lag.
@@ -141,8 +141,8 @@ impl PartitionLagEstimator {
                 interpolate_offset_to_datetime(&known_before, &known_after, offset)?
             },
             KnownOffsetSearchRes::None => {
-                let earliest_known = self.known.front().ok_or(PartitionOffsetsError::LagEstimatorNotReady)?;
-                let latest_known = self.known.back().ok_or(PartitionOffsetsError::LagEstimatorNotReady)?;
+                let earliest_known = self.earliest_offset()?;
+                let latest_known = self.latest_offset()?;
                 interpolate_offset_to_datetime(earliest_known, latest_known, offset)?
             },
         };
@@ -164,6 +164,16 @@ impl PartitionLagEstimator {
     /// a new [`PartitionLagEstimator::update()`] call will need to drop the earliest known?
     pub fn spare_capacity(&self) -> usize {
         self.known.capacity() - self.known.len()
+    }
+
+    /// Get a reference to the earliest [`KnownOffset`].
+    pub fn earliest_offset(&self) -> PartitionOffsetsResult<&KnownOffset> {
+        self.known.front().ok_or(PartitionOffsetsError::LagEstimatorNotReady)
+    }
+
+    /// Get a reference to the latest [`KnownOffset`]
+    pub fn latest_offset(&self) -> PartitionOffsetsResult<&KnownOffset> {
+        self.known.back().ok_or(PartitionOffsetsError::LagEstimatorNotReady)
     }
 }
 

@@ -8,6 +8,7 @@ mod register;
 // Exports
 pub use emitter::PartitionOffsetsEmitter;
 pub use errors::PartitionOffsetsError;
+pub use known_offset::KnownOffset;
 pub use register::PartitionOffsetsRegister;
 
 // Imports

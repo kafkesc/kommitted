@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 use chrono::{DateTime, Duration, Utc};
 use tokio::sync::mpsc::Receiver;
@@ -12,15 +9,13 @@ use super::errors::{PartitionOffsetsError, PartitionOffsetsResult};
 use super::lag_estimator::PartitionLagEstimator;
 
 use crate::kafka_types::TopicPartition;
-
-/// A [`PartitionLagEstimator`], wrapped in a [`RwLock`] for cross thread concurrency.
-type PLEVal = RwLock<PartitionLagEstimator>;
+use crate::partition_offsets::known_offset::KnownOffset;
 
 /// Holds the offset of all Topic Partitions in the Kafka Cluster, and can estimate lag of Consumers.
 ///
 /// This is where a known Consumer Group, at a known offset in time, can get it's lag estimated.
 pub struct PartitionOffsetsRegister {
-    estimators: Arc<RwLock<HashMap<TopicPartition, PLEVal>>>,
+    estimators: Arc<RwLock<HashMap<TopicPartition, RwLock<PartitionLagEstimator>>>>,
 }
 
 impl PartitionOffsetsRegister {
@@ -93,83 +88,93 @@ impl PartitionOffsetsRegister {
 }
 
 impl PartitionOffsetsRegister {
-    /// Estimate offset lag for consumer of specific `topic`, `partition`, given it's current `consumed_offset`.
+    /// Estimate offset lag for consumer of specific [`TopicPartition`], given it's current `consumed_offset`.
     ///
     /// # Arguments
     ///
-    /// * `topic` - Topic consumed by the Consumer
-    /// * `partition` - Partition of the Topic consumed by the Consumer
+    /// * `topic_partition` - Topic Partition consumed by the Consumer
     /// * `consumed_offset` - Offset up to which the Consumer has consumed
     pub async fn estimate_offset_lag(
         &self,
-        topic: &str,
-        partition: u32,
+        topic_partition: &TopicPartition,
         consumed_offset: u64,
     ) -> PartitionOffsetsResult<u64> {
-        let k = TopicPartition {
-            topic: topic.to_string(),
-            partition,
-        };
-
         self.estimators
             .read()
             .await
-            .get(&k)
-            .ok_or(PartitionOffsetsError::LagEstimatorNotFound(topic.to_string(), partition))?
+            .get(topic_partition)
+            .ok_or(PartitionOffsetsError::LagEstimatorNotFound(
+                topic_partition.topic.to_string(),
+                topic_partition.partition,
+            ))?
             .read()
             .await
             .estimate_offset_lag(consumed_offset)
     }
 
-    /// Estimate time lag for consumer of specific `topic`, `partition`, given it's current `consumed_offset` and `consumed_offset_datetime`.
+    /// Estimate time lag for consumer of specific [`TopicPartition`], given it's current `consumed_offset` and `consumed_offset_datetime`.
     ///
     /// # Arguments
     ///
-    /// * `topic` - Topic consumed by the Consumer
-    /// * `partition` - Partition of the Topic consumed by the Consumer
+    /// * `topic_partition` - Topic Partition consumed by the Consumer
     /// * `consumed_offset` - Offset up to which the Consumer has consumed
     /// * `consumed_offset_datetime` - [`Datetime<Utc>`] when the `consumed_offset` was committed
     pub async fn estimate_time_lag(
         &self,
-        topic: &str,
-        partition: u32,
+        topic_partition: &TopicPartition,
         consumed_offset: u64,
         consumed_offset_datetime: DateTime<Utc>,
     ) -> PartitionOffsetsResult<Duration> {
-        let k = TopicPartition {
-            topic: topic.to_string(),
-            partition,
-        };
-
         self.estimators
             .read()
             .await
-            .get(&k)
-            .ok_or(PartitionOffsetsError::LagEstimatorNotFound(topic.to_string(), partition))?
+            .get(topic_partition)
+            .ok_or(PartitionOffsetsError::LagEstimatorNotFound(
+                topic_partition.topic.to_string(),
+                topic_partition.partition,
+            ))?
             .read()
             .await
             .estimate_time_lag(consumed_offset, consumed_offset_datetime)
     }
 
-    /// Checks if a `topic` + `partition` pair is present.
+    /// Get the earliest known offset of specific [`TopicPartition`].
     ///
     /// # Arguments
     ///
-    /// * `topic` - Topic
-    /// * `partition` - Partition pf the Topic
-    #[allow(dead_code)]
-    pub async fn contains_topic_partition(&self, topic: &str, partition: u32) -> bool {
-        let k = TopicPartition {
-            topic: topic.to_string(),
-            partition,
-        };
-
-        self.estimators.read().await.contains_key(&k)
+    /// * `topic_partition` - Topic Partition we want to know the earliest offset of
+    pub async fn get_earliest_offset(&self, topic_partition: &TopicPartition) -> PartitionOffsetsResult<KnownOffset> {
+        self.estimators
+            .read()
+            .await
+            .get(topic_partition)
+            .ok_or(PartitionOffsetsError::LagEstimatorNotFound(
+                topic_partition.topic.to_string(),
+                topic_partition.partition,
+            ))?
+            .read()
+            .await
+            .earliest_offset()
+            .cloned()
     }
 
-    /// Get all the `(topic, partition)` tuples it contains.
-    #[allow(dead_code)]
-    pub async fn get_topic_partitions(&self) -> HashSet<TopicPartition> {
-        HashSet::from_iter(self.estimators.read().await.keys().cloned())
+    /// Get the latest known offset of specific [`TopicPartition`].
+    ///
+    /// # Arguments
+    ///
+    /// * `topic_partition` - Topic Partition we want to know the latest offset of
+    pub async fn get_latest_offset(&self, topic_partition: &TopicPartition) -> PartitionOffsetsResult<KnownOffset> {
+        self.estimators
+            .read()
+            .await
+            .get(topic_partition)
+            .ok_or(PartitionOffsetsError::LagEstimatorNotFound(
+                topic_partition.topic.to_string(),
+                topic_partition.partition,
+            ))?
+            .read()
+            .await
+            .latest_offset()
+            .cloned()
     }
 }
