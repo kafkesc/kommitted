@@ -1,6 +1,7 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
+use konsumer_offsets::ConsumerProtocolAssignment;
 use rdkafka::{admin::AdminClient, client::DefaultClientContext, groups::GroupList, ClientConfig};
 use tokio::{
     sync::{broadcast, mpsc},
@@ -9,7 +10,7 @@ use tokio::{
 };
 
 use crate::internals::Emitter;
-use crate::kafka_types::{Group, Member};
+use crate::kafka_types::{Group, GroupWithMembers, Member, MemberWithAssignment, TopicPartition};
 
 const CHANNEL_SIZE: usize = 5;
 
@@ -21,7 +22,7 @@ const FETCH_INTERVAL: Duration = Duration::from_secs(60);
 /// This reflects the internal state of Kafka and it's active Consumer Groups.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ConsumerGroups {
-    pub(crate) groups: HashMap<String, Group>,
+    pub(crate) groups: HashMap<String, GroupWithMembers>,
 }
 
 impl From<GroupList> for ConsumerGroups {
@@ -36,22 +37,41 @@ impl From<GroupList> for ConsumerGroups {
             for m in g.members() {
                 res_members.insert(
                     m.id().to_string(),
-                    Member {
-                        id: m.id().to_string(),
-                        client_id: m.client_id().to_string(),
-                        client_host: m.client_host().to_string(),
+                    MemberWithAssignment {
+                        member: Member {
+                            id: m.id().to_string(),
+                            client_id: m.client_id().to_string(),
+                            client_host: m.client_host().to_string(),
+                        },
+                        assignment: if let Some(assignment_bytes) = m.assignment() {
+                            match ConsumerProtocolAssignment::try_from(assignment_bytes) {
+                                Ok(cpa) => cpa
+                                    .assigned_topic_partitions
+                                    .into_iter()
+                                    .flat_map(TopicPartition::vec_from)
+                                    .collect::<HashSet<TopicPartition>>(),
+                                Err(e) => {
+                                    warn!("Unable to parse 'assignment' bytes when listing Consumer Groups: {}", e);
+                                    HashSet::new()
+                                },
+                            }
+                        } else {
+                            HashSet::new()
+                        },
                     },
                 );
             }
 
             res.groups.insert(
                 g.name().to_string(),
-                Group {
-                    name: g.name().to_string(),
+                GroupWithMembers {
+                    group: Group {
+                        name: g.name().to_string(),
+                        protocol: g.protocol().to_string(),
+                        protocol_type: g.protocol_type().to_string(),
+                        state: g.state().to_string(),
+                    },
                     members: res_members,
-                    protocol: g.protocol().to_string(),
-                    protocol_type: g.protocol_type().to_string(),
-                    state: g.state().to_string(),
                 },
             );
         }
