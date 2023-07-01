@@ -16,6 +16,7 @@ use std::error::Error;
 use std::sync::Arc;
 
 use tokio::sync::broadcast;
+use tokio::time::{interval, Duration};
 
 use cli::Cli;
 use internals::Emitter;
@@ -37,6 +38,29 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Arc::new(cs_reg),
         shutdown_rx.resubscribe(),
     );
+
+    // TODO: Turn this into a "waiter" module or a functionality of the registry itself
+    let mut interval = interval(Duration::from_secs(2));
+    let mut s_rx = shutdown_rx.resubscribe();
+    loop {
+        tokio::select! {
+            _ = interval.tick() => {
+                let (min, max, avg, count) = po_reg.get_usage().await;
+                info!(
+                    "Waiting for Partition Offset Register usage to reach 0.1% avg:
+                        min={min:3.3}% / max={max:3.3}% / avg={avg:3.3}%
+                        count={count}"
+                );
+                if avg > 0.1_f64 {
+                    break;
+                }
+            },
+            _ = s_rx.recv() => {
+                info!("Received shutdown signal");
+                return Ok(());
+            },
+        }
+    }
 
     // TODO / WIP: put in `konsumer_offsets_data` module
     let konsumer_offsets_data_emitter =

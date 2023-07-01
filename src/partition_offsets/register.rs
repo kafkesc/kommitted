@@ -177,4 +177,35 @@ impl PartitionOffsetsRegister {
             .latest_offset()
             .cloned()
     }
+
+    /// Get some basic registry usage stats.
+    ///
+    /// Returns the usage of the internal [`PartitionLagEstimator`]s, as `(min, max, avg, count)` tuple.
+    /// `count` is the number [`TopicPartition`] this registry has a [`PartitionLagEstimator`] of.
+    pub async fn get_usage(&self) -> (f64, f64, f64, usize) {
+        let count = self.estimators.read().await.len();
+
+        // We have no estimators usually at launch: don't bother and return zeros
+        if count == 0 {
+            return (0_f64, 0_f64, 0_f64, 0);
+        }
+
+        let mut sum = 0_f64;
+        let mut min = f64::MAX;
+        let mut max = f64::MIN;
+
+        for (_, est_rwlock) in self.estimators.read().await.iter() {
+            let curr = est_rwlock.read().await.usage_percent();
+
+            sum += curr;
+            if curr > max {
+                max = curr;
+            }
+            if curr < min {
+                min = curr;
+            }
+        }
+
+        (min, max, sum / count as f64, count)
+    }
 }
