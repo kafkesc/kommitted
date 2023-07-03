@@ -4,10 +4,11 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use rdkafka::{admin::AdminClient, client::DefaultClientContext, ClientConfig};
 use tokio::{
-    sync::{broadcast, mpsc},
+    sync::mpsc,
     task::JoinHandle,
     time::{interval, Duration},
 };
+use tokio_util::sync::CancellationToken;
 
 use crate::cluster_status::ClusterStatusRegister;
 use crate::internals::Emitter;
@@ -37,6 +38,8 @@ pub struct PartitionOffset {
 /// The watermarks are the "earliest" and "latest" known offset of a specific partition.
 /// Additionally, the "read time" wall clock is provided, so _when_ the watermarks were
 /// read is also known.
+///
+/// It shuts down when the provided [`CancellationToken`] is cancelled.
 pub struct PartitionOffsetsEmitter {
     client_config: ClientConfig,
     cluster_register: Arc<ClusterStatusRegister>,
@@ -60,7 +63,17 @@ impl PartitionOffsetsEmitter {
 impl Emitter for PartitionOffsetsEmitter {
     type Emitted = PartitionOffset;
 
-    fn spawn(&self, mut shutdown_rx: broadcast::Receiver<()>) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
+    /// Spawn a new async task to run the business logic of this struct.
+    ///
+    /// When this emitter gets spawned, it returns a [`mpsc::Receiver`] for [`PartitionOffset`],
+    /// and a [`JoinHandle`] to help join on the task spawned internally.
+    /// The task concludes (joins) only ones the inner task of the emitter terminates.
+    ///
+    /// # Arguments
+    ///
+    /// * `shutdown_token`: A [`CancellationToken`] that, when cancelled, will make the internal loop terminate.
+    ///
+    fn spawn(&self, shutdown_token: CancellationToken) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
         let admin_client: AdminClient<DefaultClientContext> =
             self.client_config.create().expect("Failed to allocate Admin Client");
 
@@ -91,8 +104,8 @@ impl Emitter for PartitionOffsetsEmitter {
                                             error!("Failed to emit {}: {e}", std::any::type_name::<PartitionOffset>());
                                         }
                                     },
-                                    _ = shutdown_rx.recv() => {
-                                        info!("Received shutdown signal");
+                                    _ = shutdown_token.cancelled() => {
+                                        info!("Shutting down");
                                         break 'outer;
                                     },
                                 }

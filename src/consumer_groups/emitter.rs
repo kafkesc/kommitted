@@ -4,10 +4,11 @@ use async_trait::async_trait;
 use konsumer_offsets::ConsumerProtocolAssignment;
 use rdkafka::{admin::AdminClient, client::DefaultClientContext, groups::GroupList, ClientConfig};
 use tokio::{
-    sync::{broadcast, mpsc},
+    sync::mpsc,
     task::JoinHandle,
     time::{interval, Duration},
 };
+use tokio_util::sync::CancellationToken;
 
 use crate::constants::KONSUMER_OFFSETS_KCL_CONSUMER;
 use crate::internals::Emitter;
@@ -91,7 +92,7 @@ impl From<GroupList> for ConsumerGroups {
 /// It wraps an Admin Kafka Client, regularly requests it for the cluster consumer groups list,
 /// and then emits it as [`ConsumerGroups`].
 ///
-/// It shuts down by sending a unit via a provided [`broadcast`].
+/// It shuts down when the provided [`CancellationToken`] is cancelled.
 pub struct ConsumerGroupsEmitter {
     admin_client_config: ClientConfig,
 }
@@ -113,7 +114,17 @@ impl ConsumerGroupsEmitter {
 impl Emitter for ConsumerGroupsEmitter {
     type Emitted = ConsumerGroups;
 
-    fn spawn(&self, mut shutdown_rx: broadcast::Receiver<()>) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
+    /// Spawn a new async task to run the business logic of this struct.
+    ///
+    /// When this emitter gets spawned, it returns a [`mpsc::Receiver`] for [`ConsumerGroups`],
+    /// and a [`JoinHandle`] to help join on the task spawned internally.
+    /// The task concludes (joins) only ones the inner task of the emitter terminates.
+    ///
+    /// # Arguments
+    ///
+    /// * `shutdown_token`: A [`CancellationToken`] that, when cancelled, will make the internal loop terminate.
+    ///
+    fn spawn(&self, shutdown_token: CancellationToken) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
         let admin_client: AdminClient<DefaultClientContext> =
             self.admin_client_config.create().expect("Failed to allocate Admin Client");
 
@@ -133,8 +144,8 @@ impl Emitter for ConsumerGroupsEmitter {
                                     error!("Failed to emit {}: {e}", std::any::type_name::<ConsumerGroups>());
                                 }
                             },
-                            _ = shutdown_rx.recv() => {
-                                info!("Received shutdown signal");
+                            _ = shutdown_token.cancelled() => {
+                                info!("Shutting down");
                                 break 'outer;
                             },
                         }

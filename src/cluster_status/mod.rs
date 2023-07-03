@@ -8,17 +8,17 @@ pub use register::ClusterStatusRegister;
 
 // Imports
 use rdkafka::ClientConfig;
-use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 
 use crate::internals::Emitter;
 
 pub fn init(
     admin_client_config: ClientConfig,
-    shutdown_rx: broadcast::Receiver<()>,
+    shutdown_token: CancellationToken,
 ) -> (ClusterStatusRegister, JoinHandle<()>) {
     // Cluster Status: emitter and register
-    let (cs_rx, cse_join) = ClusterStatusEmitter::new(admin_client_config).spawn(shutdown_rx.resubscribe());
+    let (cs_rx, cse_join) = ClusterStatusEmitter::new(admin_client_config).spawn(shutdown_token);
     let cs_reg = ClusterStatusRegister::new(cs_rx);
 
     debug!("Initialized");

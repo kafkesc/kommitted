@@ -1,21 +1,18 @@
 use async_trait::async_trait;
-use tokio::{
-    sync::{broadcast, mpsc},
-    task::JoinHandle,
-    time::Interval,
-};
+use tokio::{sync::mpsc, task::JoinHandle, time::Interval};
+use tokio_util::sync::CancellationToken;
 
 /// Type that emits an [`Send`]-able object via a [`mpsc::Receiver`].
 /// Use this when you expect to have a single receiver.
 ///
-/// It terminates itself when it receives a unit `()` via the given `shutdown_rx` [`broadcast::Receiver`].
+/// It terminates itself when [`CancellationToken`] is cancelled (elsewhere).
 ///
 /// Awaiting for its termination should be done via the returned [`JoinHandle`].
 #[async_trait]
 pub trait Emitter {
     type Emitted: Send;
 
-    fn spawn(&self, shutdown_rx: broadcast::Receiver<()>) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>);
+    fn spawn(&self, shutdown_token: CancellationToken) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>);
 
     /// Emit the `Self::Emitted`, but first wait for the next `interval` tick.
     ///

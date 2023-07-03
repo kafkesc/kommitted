@@ -1,10 +1,11 @@
 use async_trait::async_trait;
 use rdkafka::{admin::AdminClient, client::DefaultClientContext, metadata::Metadata, ClientConfig};
 use tokio::{
-    sync::{broadcast, mpsc},
+    sync::mpsc,
     task::JoinHandle,
     time::{interval, Duration},
 };
+use tokio_util::sync::CancellationToken;
 
 use crate::internals::Emitter;
 use crate::kafka_types::{Broker, TopicPartitionsStatus};
@@ -42,7 +43,7 @@ impl From<Metadata> for ClusterStatus {
 /// It wraps an Admin Kafka Client, regularly requests it for the cluster metadata,
 /// and then emits it as [`ClusterStatus`].
 ///
-/// It shuts down by sending a unit via a provided [`broadcast`].
+/// It shuts down when the provided [`CancellationToken`] is cancelled.
 pub struct ClusterStatusEmitter {
     admin_client_config: ClientConfig,
 }
@@ -66,15 +67,15 @@ impl Emitter for ClusterStatusEmitter {
 
     /// Spawn a new async task to run the business logic of this struct.
     ///
-    /// When this emitter gets spawned, it returns a [`broadcast::Receiver`] for [`ClusterStatus`],
+    /// When this emitter gets spawned, it returns a [`mpsc::Receiver`] for [`ClusterStatus`],
     /// and a [`JoinHandle`] to help join on the task spawned internally.
     /// The task concludes (joins) only ones the inner task of the emitter terminates.
     ///
     /// # Arguments
     ///
-    /// * `shutdown_rx`: A [`broadcast::Receiver`] to request the internal async task to shutdown.
+    /// * `shutdown_token`: A [`CancellationToken`] that, when cancelled, will make the internal loop terminate.
     ///
-    fn spawn(&self, mut shutdown_rx: broadcast::Receiver<()>) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
+    fn spawn(&self, shutdown_token: CancellationToken) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
         let admin_client: AdminClient<DefaultClientContext> =
             self.admin_client_config.create().expect("Failed to allocate Admin Client");
 
@@ -94,8 +95,8 @@ impl Emitter for ClusterStatusEmitter {
                                     error!("Failed to emit {}: {e}", std::any::type_name::<ClusterStatus>());
                                 }
                             },
-                            _ = shutdown_rx.recv() => {
-                                info!("Received shutdown signal");
+                            _ = shutdown_token.cancelled() => {
+                                info!("Shutting down");
                                 break 'outer;
                             },
                         }
