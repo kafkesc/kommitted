@@ -21,6 +21,14 @@ use tokio_util::sync::CancellationToken;
 use cli::Cli;
 use internals::Emitter;
 
+// TODO HTTP Endpoints
+//   /                Landing page
+//   /metrics         Prometheus Metrics, filterable via `collect[]` array query param of metrics filter by
+//   /status/healthy  Service healthy
+//   /status/ready    Service ready (metrics are ready to be scraped)
+//   /groups
+//   /cluster
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = parse_cli_and_init_logging();
