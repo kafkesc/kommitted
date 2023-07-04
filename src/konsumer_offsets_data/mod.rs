@@ -1,10 +1,10 @@
 mod emitter;
 
+use konsumer_offsets::KonsumerOffsetsData;
 use rdkafka::ClientConfig;
 use tokio::sync::mpsc::Receiver;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use konsumer_offsets::KonsumerOffsetsData;
 
 use crate::internals::Emitter;
 

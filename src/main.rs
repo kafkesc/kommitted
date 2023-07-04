@@ -17,8 +17,8 @@ use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
 
-use crate::partition_offsets::PartitionOffsetsRegister;
 use crate::cli::Cli;
+use crate::partition_offsets::PartitionOffsetsRegister;
 
 // TODO HTTP Endpoints
 //   /                Landing page
