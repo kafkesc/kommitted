@@ -15,11 +15,10 @@ mod partition_offsets;
 use std::error::Error;
 use std::sync::Arc;
 
-use tokio::time::{interval, Duration};
 use tokio_util::sync::CancellationToken;
 
-use cli::Cli;
-use internals::Emitter;
+use crate::partition_offsets::PartitionOffsetsRegister;
+use crate::cli::Cli;
 
 // TODO HTTP Endpoints
 //   /                Landing page
@@ -46,47 +45,26 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Arc::new(cs_reg),
         shutdown_token.clone(),
     );
-
-    // TODO: Turn this into a "waiter" module or a functionality of the registry itself
-    let mut interval = interval(Duration::from_secs(2));
-    let shutdown_token_clone = shutdown_token.clone();
-    loop {
-        tokio::select! {
-            _ = interval.tick() => {
-                let (min, max, avg, count) = po_reg.get_usage().await;
-                info!(
-                    "Waiting for Partition Offset Register usage to reach 0.1% avg:
-                        min={min:3.3}% / max={max:3.3}% / avg={avg:3.3}%
-                        count={count}"
-                );
-                if avg > 0.1_f64 {
-                    break;
-                }
-            },
-            _ = shutdown_token_clone.cancelled() => {
-                info!("Received shutdown signal");
-                return Ok(());
-            },
-        }
+    // Await for the Partition Offset register to be ready
+    if !po_reg.await_ready(0.1, shutdown_token.clone()).await {
+        warn!("Terminated before {} was ready", std::any::type_name::<PartitionOffsetsRegister>());
+        std::process::exit(exit_code::SERVICE_UNAVAILABLE);
     }
 
-    // TODO / WIP: put in `konsumer_offsets_data` module
-    let konsumer_offsets_data_emitter =
-        konsumer_offsets_data::KonsumerOffsetsDataEmitter::new(admin_client_config.clone());
-    let (kod_rx, kod_join) = konsumer_offsets_data_emitter.spawn(shutdown_token.clone());
+    // Init `konsumer_offsets_data` module
+    let (kod_rx, kod_join) = konsumer_offsets_data::init(admin_client_config.clone(), shutdown_token.clone());
 
-    // TODO / WIP: put in `consumer_groups` module
-    let consumer_groups_emitter = consumer_groups::ConsumerGroupsEmitter::new(admin_client_config.clone());
-    let (cg_rx, cg_join) = consumer_groups_emitter.spawn(shutdown_token.clone());
+    // Init `consumer_groups` module
+    let (cg_rx, cg_join) = consumer_groups::init(admin_client_config.clone(), shutdown_token.clone());
 
-    // TODO / WIP: put in `lag_register` module
-    let _l_reg = lag_register::LagRegister::new(cg_rx, kod_rx, Arc::new(po_reg));
+    // Init `lag_register` module
+    let _l_reg = lag_register::init(cg_rx, kod_rx, Arc::new(po_reg));
 
     // Join all the async tasks, then let it terminate
     let _ = tokio::join!(cs_join, po_join, kod_join, cg_join);
 
     info!("Shutdown!");
-    Ok(())
+    std::process::exit(exit_code::SUCCESS);
 }
 
 fn parse_cli_and_init_logging() -> Cli {

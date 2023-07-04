@@ -299,6 +299,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "exit-code"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf4cdb977193f2d7688525ca10d86199fe9bdd9db26b97ef490558128c643dc4"
+
+[[package]]
 name = "futures-channel"
 version = "0.3.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -446,6 +452,7 @@ dependencies = [
  "clap",
  "ctrlc",
  "env_logger",
+ "exit-code",
  "konsumer_offsets",
  "log",
  "rdkafka",

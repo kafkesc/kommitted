@@ -22,6 +22,7 @@ chrono = "0.4.26"
 clap = { version = "4.3.10", features = ["derive", "deprecated", "env", "wrap_help"] }
 ctrlc = { version = "3.4.0", features = ["termination"] }
 env_logger = "0.10.0"
+exit-code = "1.0.0"
 konsumer_offsets = { version = "0.3.0", default-features = false, features = ["ts_chrono"] }
 log = "0.4.19"
 regex = "1.8.4"

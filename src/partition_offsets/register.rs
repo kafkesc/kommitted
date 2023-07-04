@@ -1,8 +1,12 @@
 use std::{collections::HashMap, sync::Arc};
 
 use chrono::{DateTime, Duration, Utc};
-use tokio::sync::mpsc::Receiver;
-use tokio::sync::RwLock;
+use tokio::{
+    sync::{mpsc::Receiver, RwLock},
+    time::interval,
+    time::Duration as TokioDuration,
+};
+use tokio_util::sync::CancellationToken;
 
 use super::emitter::PartitionOffset;
 use super::errors::{PartitionOffsetsError, PartitionOffsetsResult};
@@ -10,6 +14,8 @@ use super::lag_estimator::PartitionLagEstimator;
 
 use crate::kafka_types::TopicPartition;
 use crate::partition_offsets::known_offset::KnownOffset;
+
+const READYNESS_CHECK_INTERVAL: TokioDuration = TokioDuration::from_secs(2);
 
 /// Holds the offset of all Topic Partitions in the Kafka Cluster, and can estimate lag of Consumers.
 ///
@@ -207,5 +213,53 @@ impl PartitionOffsetsRegister {
         }
 
         (min, max, sum / count as f64, count)
+    }
+
+    /// Waits for when [`Self`] is ready, or has been terminated.
+    ///
+    /// Returns `false` if this is terminated before reaching the [`Self::is_ready`] state.
+    ///
+    /// # Arguments
+    ///
+    /// * `readyness_percent` - The percentage of ready-ness we want for [`Self`]
+    ///   to be considered "ready".
+    /// * `shutdown_token` - If this [`CancellationToken`] gets cancelled,
+    ///   this will stop waiting and return.
+    pub async fn await_ready(&self, readyness_percent: f64, shutdown_token: CancellationToken) -> bool {
+        let mut interval = interval(READYNESS_CHECK_INTERVAL);
+        loop {
+            tokio::select! {
+                _ = interval.tick() => {
+                    if self.is_ready(readyness_percent).await {
+                        return true;
+                    }
+                },
+                _ = shutdown_token.cancelled() => {
+                    info!("Received shutdown signal");
+                    return false;
+                },
+            }
+        }
+    }
+
+    /// Returns `true` if [`Self`] is ready, `false` otherwise.
+    ///
+    /// # Arguments
+    ///
+    /// * `readyness_percent` - The percentage of readyness we want for [`Self`] to be considered "ready".
+    pub async fn is_ready(&self, readyness_percent: f64) -> bool {
+        let (min, max, avg, count) = self.get_usage().await;
+        let is_ready = avg > readyness_percent;
+
+        info!(
+            "{} usage stats:
+                known partitions: {count}
+                known offsets per partition:
+                    min={min:3.3}% / max={max:3.3}% / avg={avg:3.3}%
+                is ready: {is_ready}",
+            std::any::type_name::<PartitionOffsetsRegister>()
+        );
+
+        is_ready
     }
 }
