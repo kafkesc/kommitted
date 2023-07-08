@@ -5,6 +5,7 @@ mod cli;
 mod cluster_status;
 mod constants;
 mod consumer_groups;
+mod http;
 mod internals;
 mod kafka_types;
 mod konsumer_offsets_data;
@@ -12,21 +13,12 @@ mod lag_register;
 mod logging;
 mod partition_offsets;
 
-use std::error::Error;
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 
 use tokio_util::sync::CancellationToken;
 
 use crate::cli::Cli;
 use crate::partition_offsets::PartitionOffsetsRegister;
-
-// TODO HTTP Endpoints
-//   /                Landing page
-//   /metrics         Prometheus Metrics, filterable via `collect[]` array query param of metrics filter by
-//   /status/healthy  Service healthy
-//   /status/ready    Service ready (metrics are ready to be scraped)
-//   /groups
-//   /cluster
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -58,10 +50,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let (cg_rx, cg_join) = consumer_groups::init(admin_client_config.clone(), shutdown_token.clone());
 
     // Init `lag_register` module
-    let _l_reg = lag_register::init(cg_rx, kod_rx, Arc::new(po_reg));
+    let lag_reg = lag_register::init(cg_rx, kod_rx, Arc::new(po_reg));
+    let lag_reg_arc = Arc::new(lag_reg);
+
+    // Init `http` module
+    let http_fut = http::init(lag_reg_arc.clone(), shutdown_token.clone());
 
     // Join all the async tasks, then let it terminate
-    let _ = tokio::join!(cs_join, po_join, kod_join, cg_join);
+    let _ = tokio::join!(cs_join, po_join, kod_join, cg_join, http_fut);
 
     info!("Shutdown!");
     std::process::exit(exit_code::SUCCESS);
