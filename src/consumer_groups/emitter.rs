@@ -133,7 +133,7 @@ impl Emitter for ConsumerGroupsEmitter {
         let join_handle = tokio::spawn(async move {
             let mut interval = interval(FETCH_INTERVAL);
 
-            'outer: loop {
+            loop {
                 let res_groups = admin_client.inner().fetch_group_list(None, FETCH_TIMEOUT).map(Self::Emitted::from);
 
                 match res_groups {
@@ -146,7 +146,7 @@ impl Emitter for ConsumerGroupsEmitter {
                             },
                             _ = shutdown_token.cancelled() => {
                                 info!("Shutting down");
-                                break 'outer;
+                                break;
                             },
                         }
                     },

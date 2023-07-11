@@ -13,13 +13,13 @@ use super::errors::{PartitionOffsetsError, PartitionOffsetsResult};
 use super::lag_estimator::PartitionLagEstimator;
 
 use crate::kafka_types::TopicPartition;
-use crate::partition_offsets::known_offset::KnownOffset;
+use crate::partition_offsets::tracked_offset::TrackedOffset;
 
 const READYNESS_CHECK_INTERVAL: TokioDuration = TokioDuration::from_secs(2);
 
 /// Holds the offset of all Topic Partitions in the Kafka Cluster, and can estimate lag of Consumers.
 ///
-/// This is where a known Consumer Group, at a known offset in time, can get it's lag estimated.
+/// This is where a tracked Consumer Group, at a tracked offset in time, can get it's lag estimated.
 pub struct PartitionOffsetsRegister {
     estimators: Arc<RwLock<HashMap<TopicPartition, RwLock<PartitionLagEstimator>>>>,
 }
@@ -79,7 +79,7 @@ impl PartitionOffsetsRegister {
                             .unwrap_or_else(|| panic!("{} for {:#?} could not be found: this should never happen!", std::any::type_name::<PartitionLagEstimator>(), k))
                             .write()
                             .await
-                            .update(po.latest_offset, po.read_datetime);
+                            .update(po.earliest_offset, po.latest_offset, po.read_datetime);
                     },
                     else => {
                         info!("Emitters stopping: breaking (internal) loop");
@@ -144,12 +144,15 @@ impl PartitionOffsetsRegister {
             .estimate_time_lag(consumed_offset, consumed_offset_datetime)
     }
 
-    /// Get the earliest known offset of specific [`TopicPartition`].
+    /// Get the earliest tracked offset of specific [`TopicPartition`].
     ///
     /// # Arguments
     ///
-    /// * `topic_partition` - Topic Partition we want to know the earliest offset of
-    pub async fn get_earliest_offset(&self, topic_partition: &TopicPartition) -> PartitionOffsetsResult<KnownOffset> {
+    /// * `topic_partition` - Topic Partition we want to know the earliest tracked offset of
+    pub async fn get_earliest_tracked_offset(
+        &self,
+        topic_partition: &TopicPartition,
+    ) -> PartitionOffsetsResult<TrackedOffset> {
         self.estimators
             .read()
             .await
@@ -160,16 +163,19 @@ impl PartitionOffsetsRegister {
             ))?
             .read()
             .await
-            .earliest_offset()
+            .earliest_tracked_offset()
             .cloned()
     }
 
-    /// Get the latest known offset of specific [`TopicPartition`].
+    /// Get the latest tracked offset of specific [`TopicPartition`].
     ///
     /// # Arguments
     ///
-    /// * `topic_partition` - Topic Partition we want to know the latest offset of
-    pub async fn get_latest_offset(&self, topic_partition: &TopicPartition) -> PartitionOffsetsResult<KnownOffset> {
+    /// * `topic_partition` - Topic Partition we want to know the latest tracked offset of
+    pub async fn get_latest_tracked_offset(
+        &self,
+        topic_partition: &TopicPartition,
+    ) -> PartitionOffsetsResult<TrackedOffset> {
         self.estimators
             .read()
             .await
@@ -180,8 +186,42 @@ impl PartitionOffsetsRegister {
             ))?
             .read()
             .await
-            .latest_offset()
+            .latest_tracked_offset()
             .cloned()
+    }
+
+    /// Get the earliest available offset of specific [`TopicPartition`].
+    ///
+    /// This is the earliest offset still available in the Kafka Cluster.
+    pub async fn get_earliest_available_offset(&self, topic_partition: &TopicPartition) -> PartitionOffsetsResult<u64> {
+        self.estimators
+            .read()
+            .await
+            .get(topic_partition)
+            .ok_or(PartitionOffsetsError::LagEstimatorNotFound(
+                topic_partition.topic.to_string(),
+                topic_partition.partition,
+            ))?
+            .read()
+            .await
+            .earliest_available_offset()
+    }
+
+    /// Get the latest available offset of specific [`TopicPartition`].
+    ///
+    /// This is the latest offset still available in the Kafka Cluster.
+    pub async fn get_latest_available_offset(&self, topic_partition: &TopicPartition) -> PartitionOffsetsResult<u64> {
+        self.estimators
+            .read()
+            .await
+            .get(topic_partition)
+            .ok_or(PartitionOffsetsError::LagEstimatorNotFound(
+                topic_partition.topic.to_string(),
+                topic_partition.partition,
+            ))?
+            .read()
+            .await
+            .latest_available_offset()
     }
 
     /// Get some basic registry usage stats.
@@ -253,8 +293,8 @@ impl PartitionOffsetsRegister {
 
         info!(
             "{} usage stats:
-                known partitions: {count}
-                known offsets per partition:
+                tracked partitions: {count}
+                tracked offsets per partition:
                     min={min:3.3}% / max={max:3.3}% / avg={avg:3.3}%
                 is ready: {is_ready}",
             std::any::type_name::<PartitionOffsetsRegister>()

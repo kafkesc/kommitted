@@ -1,15 +1,15 @@
 // Inner modules
 mod emitter;
 mod errors;
-mod known_offset;
 mod lag_estimator;
 mod register;
+mod tracked_offset;
 
 // Exports
 pub use emitter::PartitionOffsetsEmitter;
 pub use errors::PartitionOffsetsError;
-pub use known_offset::KnownOffset;
 pub use register::PartitionOffsetsRegister;
+pub use tracked_offset::TrackedOffset;
 
 // Imports
 use std::sync::Arc;

@@ -3,8 +3,8 @@ use std::collections::VecDeque;
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 
 use super::errors::{PartitionOffsetsError, PartitionOffsetsResult};
-use super::known_offset::KnownOffset;
-use super::known_offset::{search, KnownOffsetSearchRes};
+use super::tracked_offset::TrackedOffset;
+use super::tracked_offset::{search, TrackedOffsetSearchRes};
 
 /// Estimates lag for a given Topic Partition.
 ///
@@ -18,55 +18,92 @@ use super::known_offset::{search, KnownOffsetSearchRes};
 /// It can then be queried to estimate _lag_ and _time lag_, by providing information about
 /// the committed offset of a specific consumer group of this Topic Partition.
 pub struct PartitionLagEstimator {
-    known: VecDeque<KnownOffset>,
+    /// Earliest offset that the Cluster is storing about a given Topic Partition, still available to consume.
+    earliest_available_offset: Option<u64>,
+
+    /// Latest offsets tracked by the estimator for a given Topic Partition.
+    ///
+    /// The `front` of the [`VecQueue`] is the first "latest offset" we collected of this
+    /// topic partition, before new ones were collected: for lack of a better name, it is
+    /// the "earliest latest tracked offset".
+    ///
+    /// The `back` of the [`VecQueue`] is of course the last "latest offset" we collected
+    /// of this topic partition.
+    ///
+    /// Based on the `capacity` provided when calling [`Self::new(usize)`], the `front` and
+    /// `back` move like a sliding window, as we don't want the system to keep track of every
+    /// offset ever collected. Instead we keep a specific amount (`capacity`) that progresses
+    /// towards newer offset information over time.
+    latest_tracked_offsets: VecDeque<TrackedOffset>,
 }
 
 impl PartitionLagEstimator {
-    /// Create new [`PartitionLagEstimator`] of given capacity for [`KnownOffset`]s.
+    /// Create new [`PartitionLagEstimator`] of given capacity for [`TrackedOffset`]s.
     ///
     /// As a rule of thumb, we allocate enough to fit 1 call to [`update`] per second:
     /// every second a new `latest_offset` would be added to the estimator.
     ///
     /// # Arguments
     ///
-    /// * `capacity` - The amount of data points (i.e. history of known offsets) we want to keep
+    /// * `capacity` - The amount of data points (i.e. history of tracked offsets) we want to keep
     pub fn new(capacity: usize) -> PartitionLagEstimator {
         PartitionLagEstimator {
-            known: VecDeque::with_capacity(capacity),
+            earliest_available_offset: None,
+            latest_tracked_offsets: VecDeque::with_capacity(capacity),
         }
     }
 
-    /// Update estimator with a new data point: `new_latest` offset and related `new_latest_datetime`.
+    /// Update estimator with a new data points.
     ///
-    /// It will automatically remove the oldest known offset, if the internal collection
+    /// It will automatically remove the oldest tracked offset, if the internal collection
     /// has reached capacity (decided at creation time).
     ///
     /// NOTE: This will ignore any `new_latest` offset data point,
-    /// that is in the past or already known.
+    /// that is in the past or already tracked.
     ///
     /// # Arguments
     ///
-    /// * `new_latest` - A new offset that should become the new latest known
-    /// * `new_latest_datetime` - The [`DateTime<Utc>`] of the new offset
-    pub fn update(&mut self, new_latest: u64, new_latest_datetime: DateTime<Utc>) {
-        // Validate the input, comparing to the latest known offset
-        if let Some(curr_latest) = self.known.back() {
-            if curr_latest.offset == new_latest {
+    /// * `new_earliest_available` - An old offset that is now the earliest still available into the cluster;
+    ///   this is NOT the the same as the "earliest latest tracked", but what actually is the
+    ///   earliest offset that the cluster still holds; it means that any previous offset
+    ///   has been discarded by Kafka
+    /// * `new_latest_tracked` - A new offset that should become the new latest tracked
+    /// * `new_latest_tracked_datetime` - The [`DateTime<Utc>`] of the new offset
+    pub fn update(
+        &mut self,
+        new_earliest_available: u64,
+        new_latest_tracked: u64,
+        new_latest_tracked_datetime: DateTime<Utc>,
+    ) {
+        // Update the earliest offset available in the cluster
+        if let Some(eso) = self.earliest_available_offset {
+            if eso > new_earliest_available {
+                warn!(
+                    "Update with earliest available offset {} precedes current {}: should never happen",
+                    new_earliest_available, eso
+                )
+            }
+        }
+        self.earliest_available_offset = Some(new_earliest_available);
+
+        // Validate the input, comparing to the latest tracked offset
+        if let Some(curr_latest) = self.latest_tracked_offsets.back() {
+            if curr_latest.offset == new_latest_tracked {
                 // Ignore update if we already know this offset
-                trace!("Update with offset {} already known: ignoring", curr_latest.offset);
+                trace!("Update with offset {} already tracked: ignoring", curr_latest.offset);
                 return;
-            } else if curr_latest.offset > new_latest {
-                // Unlikely scenario: ignore update if the offset precedes latest known
+            } else if curr_latest.offset > new_latest_tracked {
+                // Unlikely scenario: ignore update if the offset precedes latest tracked
                 warn!(
                     "Update with offset {} that precedes current latest {}: ignoring",
-                    new_latest, curr_latest.offset
+                    new_latest_tracked, curr_latest.offset
                 );
                 return;
-            } else if curr_latest.offset < new_latest && curr_latest.at > new_latest_datetime {
-                // Very unlikely scenario: ignore update if offset date-time precedes latest known
+            } else if curr_latest.offset < new_latest_tracked && curr_latest.at > new_latest_tracked_datetime {
+                // Very unlikely scenario: ignore update if offset date-time precedes latest tracked
                 warn!(
                     "Update with offset {} of date-time '{}' that precedes current latest {} of '{}': ignoring",
-                    new_latest, new_latest_datetime, curr_latest.offset, curr_latest.at
+                    new_latest_tracked, new_latest_tracked_datetime, curr_latest.offset, curr_latest.at
                 );
                 return;
             }
@@ -74,18 +111,18 @@ impl PartitionLagEstimator {
 
         // If we have no more spare capacity, drop the front instead of letting capacity grow
         if self.spare_capacity() == 0 {
-            self.known.pop_front();
+            self.latest_tracked_offsets.pop_front();
         }
 
         // Append to the back
-        self.known.push_back(KnownOffset {
-            offset: new_latest,
-            at: new_latest_datetime,
+        self.latest_tracked_offsets.push_back(TrackedOffset {
+            offset: new_latest_tracked,
+            at: new_latest_tracked_datetime,
         });
 
         // Ensure it's a contiguous slice, so that we can do binary search on it
         // when estimating.
-        self.known.make_contiguous();
+        self.latest_tracked_offsets.make_contiguous();
     }
 
     /// Estimate offset lag.
@@ -99,16 +136,16 @@ impl PartitionLagEstimator {
     ///
     /// # Arguments
     ///
-    /// * `offset` - Given offset we want to compare against the latest known offset
+    /// * `offset` - Given offset we want to compare against the latest tracked offset
     pub fn estimate_offset_lag(&self, offset: u64) -> PartitionOffsetsResult<u64> {
-        let known_latest_offset = self.latest_offset()?.offset;
+        let lto = self.latest_tracked_offset()?.offset;
 
         // It's rare, but if we happen to receive a consumed offset that is ahead of the last
-        // known end offset, we can just return `0` for lag.
-        if offset > known_latest_offset {
+        // tracked end offset, we can just return `0` for lag.
+        if offset > lto {
             Ok(0)
         } else {
-            Ok(known_latest_offset - offset)
+            Ok(lto - offset)
         }
     }
 
@@ -118,17 +155,17 @@ impl PartitionLagEstimator {
     /// a returns a [`Duration`] estimation of the time lag accumulated by the consumer group.
     ///
     /// This estimation is done by a linear interpolation/extrapolation, where the fixed points
-    /// are the [`KnownOffset`]s contained in the [`PartitionLagEstimator`] at the time of call.
+    /// are the [`TrackedOffset`]s contained in the [`PartitionLagEstimator`] at the time of call.
     ///
     /// # Arguments
     ///
-    /// * `offset` - Given offset we want to compare against the latest known offset
+    /// * `offset` - Given offset we want to compare against the latest tracked offset
     /// * `offset_datetime` - The [`DateTime<Utc>`] this offset was committed
     pub fn estimate_time_lag(&self, offset: u64, offset_datetime: DateTime<Utc>) -> PartitionOffsetsResult<Duration> {
         // It's rare, but if we happen to receive a consumed offset that is ahead of the last
-        // known end offset, we can just return a Duration of `0` for time lag.
-        let known_latest_offset = self.latest_offset()?.offset;
-        if offset > known_latest_offset {
+        // tracked end offset, we can just return a Duration of `0` for time lag.
+        let lto = self.latest_tracked_offset()?.offset;
+        if offset > lto {
             return Ok(Duration::zero());
         }
 
@@ -138,25 +175,25 @@ impl PartitionLagEstimator {
         // At this stage we need slice-type access to the content for search, and because internally
         // a `VecDequeue` is a ring-buffer, calls to `make_contiguous()` ensure that we get all
         // the content in a single borrowed slice when we get here.
-        let (slice, _) = self.known.as_slices();
+        let (slice, _) = self.latest_tracked_offsets.as_slices();
 
         let search_res = search(offset, slice);
 
         let estimated_produced_offset_datetime = match search_res {
-            KnownOffsetSearchRes::Exact(found) => found.at,
-            KnownOffsetSearchRes::Range(known_before, known_after) => {
-                interpolate_offset_to_datetime(&known_before, &known_after, offset)?
+            TrackedOffsetSearchRes::Exact(found) => found.at,
+            TrackedOffsetSearchRes::Range(tracked_before, tracked_after) => {
+                interpolate_offset_to_datetime(&tracked_before, &tracked_after, offset)?
             },
-            KnownOffsetSearchRes::None => {
-                let earliest_known = self.earliest_offset()?;
-                let latest_known = self.latest_offset()?;
-                let second_latest_known = self.nth_latest_offset(2)?;
+            TrackedOffsetSearchRes::None => {
+                let earliest_tracked = self.earliest_tracked_offset()?;
+                let latest_tracked = self.latest_tracked_offset()?;
+                let second_latest_tracked = self.nth_latest_tracked_offset(2)?;
 
-                // Estimate production time, considering widest range possible: earliest and latest known
-                let widest_estimate = interpolate_offset_to_datetime(earliest_known, latest_known, offset)?;
+                // Estimate production time, considering widest range possible: earliest and latest tracked
+                let widest_estimate = interpolate_offset_to_datetime(earliest_tracked, latest_tracked, offset)?;
 
-                // Estimate production time, considering narrowest range possible: 2nd-latest and latest known
-                let narrowest_estimate = interpolate_offset_to_datetime(second_latest_known, latest_known, offset)?;
+                // Estimate production time, considering narrowest range possible: 2nd-latest and latest tracked
+                let narrowest_estimate = interpolate_offset_to_datetime(second_latest_tracked, latest_tracked, offset)?;
 
                 // Return the average of the 2 estimates
                 if widest_estimate < narrowest_estimate {
@@ -183,36 +220,48 @@ impl PartitionLagEstimator {
     }
 
     /// Given the constructor-time `capacity`, how much capacity is left spare, before
-    /// a new [`PartitionLagEstimator::update()`] call will need to drop the earliest known?
+    /// a new [`PartitionLagEstimator::update()`] call will need to drop the earliest tracked?
     pub fn spare_capacity(&self) -> usize {
-        self.known.capacity() - self.known.len()
+        self.latest_tracked_offsets.capacity() - self.latest_tracked_offsets.len()
     }
 
     /// Given the constructor-time `capacity`, at how much usage percent is it, before
-    /// a new [`PartitionLagEstimator::update()`] call will need to drop the earliest known?
+    /// a new [`PartitionLagEstimator::update()`] call will need to drop the earliest tracked?
     ///
     /// This is useful to assess how "full" is the `PartitionLagEstimator`.
     pub fn usage_percent(&self) -> f64 {
-        self.known.len() as f64 / self.known.capacity() as f64 * 100_f64
+        self.latest_tracked_offsets.len() as f64 / self.latest_tracked_offsets.capacity() as f64 * 100_f64
     }
 
-    /// Get a reference to the earliest [`KnownOffset`].
-    pub fn earliest_offset(&self) -> PartitionOffsetsResult<&KnownOffset> {
-        self.known.front().ok_or(PartitionOffsetsError::LagEstimatorNotReady)
+    /// Get the earliest offset available in the cluster
+    pub fn earliest_available_offset(&self) -> PartitionOffsetsResult<u64> {
+        self.earliest_available_offset.ok_or(PartitionOffsetsError::LagEstimatorNotReady)
     }
 
-    /// Get a reference to the latest [`KnownOffset`]
-    pub fn latest_offset(&self) -> PartitionOffsetsResult<&KnownOffset> {
-        self.known.back().ok_or(PartitionOffsetsError::LagEstimatorNotReady)
+    /// Get the latest offset available in the cluster
+    pub fn latest_available_offset(&self) -> PartitionOffsetsResult<u64> {
+        self.latest_tracked_offset().map(|ko| ko.offset)
     }
 
-    /// Get a reference to the Nth latest [`KnownOffset`]
-    pub fn nth_latest_offset(&self, pos: usize) -> PartitionOffsetsResult<&KnownOffset> {
-        self.known.get(self.known.len().wrapping_sub(pos)).ok_or(PartitionOffsetsError::LagEstimatorNotReady)
+    /// Get a reference to the earliest [`TrackedOffset`].
+    pub fn earliest_tracked_offset(&self) -> PartitionOffsetsResult<&TrackedOffset> {
+        self.latest_tracked_offsets.front().ok_or(PartitionOffsetsError::LagEstimatorNotReady)
+    }
+
+    /// Get a reference to the latest [`TrackedOffset`]
+    pub fn latest_tracked_offset(&self) -> PartitionOffsetsResult<&TrackedOffset> {
+        self.latest_tracked_offsets.back().ok_or(PartitionOffsetsError::LagEstimatorNotReady)
+    }
+
+    /// Get a reference to the Nth latest [`TrackedOffset`]
+    pub fn nth_latest_tracked_offset(&self, pos: usize) -> PartitionOffsetsResult<&TrackedOffset> {
+        self.latest_tracked_offsets
+            .get(self.latest_tracked_offsets.len().wrapping_sub(pos))
+            .ok_or(PartitionOffsetsError::LagEstimatorNotReady)
     }
 }
 
-/// Interpolate [`KnownOffset`]s and Kafka Topic Partition offset, to get a [`DateTime<Utc>`].
+/// Interpolate [`TrackedOffset`]s and Kafka Topic Partition offset, to get a [`DateTime<Utc>`].
 ///
 /// The "cartesian plan" can imagined with _time_ on the _x-axis_, and _offset_ on the _y-axis_.
 ///
@@ -222,8 +271,8 @@ impl PartitionLagEstimator {
 /// * `p2` - Second point for the linear interpolation
 /// * `y_offset` - The _y_ offset coordinate we want to find the _x_ [`DateTime<Utc>`] coordinate of.
 fn interpolate_offset_to_datetime(
-    p1: &KnownOffset,
-    p2: &KnownOffset,
+    p1: &TrackedOffset,
+    p2: &TrackedOffset,
     y_offset: u64,
 ) -> PartitionOffsetsResult<DateTime<Utc>> {
     // Formula:
@@ -265,11 +314,11 @@ fn utc_from_ms(utc_timestamp_ms: i64) -> PartitionOffsetsResult<DateTime<Utc>> {
 
 #[cfg(test)]
 mod test {
-    use crate::partition_offsets::known_offset::KnownOffset;
     use crate::partition_offsets::lag_estimator::{interpolate_offset_to_datetime, utc_from_ms, PartitionLagEstimator};
+    use crate::partition_offsets::tracked_offset::TrackedOffset;
     use chrono::Duration;
 
-    fn example_known_offsets() -> (Vec<u64>, Vec<i64>) {
+    fn example_tracked_offsets() -> (Vec<u64>, Vec<i64>) {
         (
             vec![1346, 1500, 1700, 1893, 2001, 2091, 2341, 2559],
             vec![
@@ -287,14 +336,14 @@ mod test {
 
     #[test]
     fn test_interpolate_offset_to_datetime() {
-        let (off, ts) = example_known_offsets();
+        let (off, ts) = example_tracked_offsets();
 
-        let p1 = KnownOffset {
+        let p1 = TrackedOffset {
             offset: off[0],
             at: utc_from_ms(ts[0]).unwrap(),
         };
 
-        let p2 = KnownOffset {
+        let p2 = TrackedOffset {
             offset: off[7],
             at: utc_from_ms(ts[7]).unwrap(),
         };
@@ -313,12 +362,12 @@ mod test {
 
     #[test]
     fn estimate_offset_lag() {
-        let (off, ts) = example_known_offsets();
+        let (off, ts) = example_tracked_offsets();
 
         // Setup estimator with example input
         let mut estimator = PartitionLagEstimator::new(10);
         for (idx, offset) in off.iter().enumerate() {
-            estimator.update(*offset, utc_from_ms(ts[idx]).unwrap());
+            estimator.update(10, *offset, utc_from_ms(ts[idx]).unwrap());
         }
 
         let last_off = off.last().unwrap();
@@ -334,30 +383,30 @@ mod test {
     }
 
     #[test]
-    fn should_ignore_updates_that_known_datapoints() {
-        let (off, ts) = example_known_offsets();
+    fn should_ignore_updates_that_tracked_datapoints() {
+        let (off, ts) = example_tracked_offsets();
 
         // Setup estimator with example input
         let mut estimator = PartitionLagEstimator::new(10);
         for (idx, offset) in off.iter().enumerate() {
-            estimator.update(*offset, utc_from_ms(ts[idx]).unwrap());
+            estimator.update(1, *offset, utc_from_ms(ts[idx]).unwrap());
         }
 
         assert_eq!(estimator.spare_capacity(), 2);
-        estimator.update(off[7], utc_from_ms(ts[7]).unwrap());
-        estimator.update(off[7], utc_from_ms(ts[7]).unwrap());
-        estimator.update(off[7], utc_from_ms(ts[7]).unwrap());
+        estimator.update(10, off[7], utc_from_ms(ts[7]).unwrap());
+        estimator.update(11, off[7], utc_from_ms(ts[7]).unwrap());
+        estimator.update(12, off[7], utc_from_ms(ts[7]).unwrap());
         assert_eq!(estimator.spare_capacity(), 2);
     }
 
     #[test]
     fn estimate_time_lag() {
-        let (off, ts) = example_known_offsets();
+        let (off, ts) = example_tracked_offsets();
 
         // Setup estimator with example input
         let mut estimator = PartitionLagEstimator::new(10);
         for (idx, offset) in off.iter().enumerate() {
-            estimator.update(*offset, utc_from_ms(ts[idx]).unwrap());
+            estimator.update(10, *offset, utc_from_ms(ts[idx]).unwrap());
         }
 
         assert_eq!(
@@ -379,15 +428,15 @@ mod test {
     }
 
     #[test]
-    fn discard_old_known_offsets() {
+    fn discard_old_tracked_offsets() {
         let mut estimator = PartitionLagEstimator::new(5);
 
         // Add first 5 points
-        estimator.update(5, utc_from_ms(10).unwrap()); //< empty
-        estimator.update(10, utc_from_ms(20).unwrap());
-        estimator.update(13, utc_from_ms(22).unwrap());
-        estimator.update(21, utc_from_ms(31).unwrap());
-        estimator.update(33, utc_from_ms(59).unwrap()); //< at capacity
+        estimator.update(1, 5, utc_from_ms(10).unwrap()); //< empty
+        estimator.update(1, 10, utc_from_ms(20).unwrap());
+        estimator.update(1, 13, utc_from_ms(22).unwrap());
+        estimator.update(1, 21, utc_from_ms(31).unwrap());
+        estimator.update(1, 33, utc_from_ms(59).unwrap()); //< at capacity
 
         // Estimate on and inside the first 2: the lag is predictable,
         // by looking at the data we just entered above for offset `5` and `10`
@@ -396,8 +445,8 @@ mod test {
         assert_eq!(estimator.estimate_time_lag(10, utc_from_ms(23).unwrap()), Ok(Duration::nanoseconds(3000000)));
 
         // Add 2 more: this should push the first 2 (offsets `5` and `10` off the internal queue)
-        estimator.update(39, utc_from_ms(73).unwrap());
-        estimator.update(41, utc_from_ms(81).unwrap());
+        estimator.update(2, 39, utc_from_ms(73).unwrap());
+        estimator.update(2, 41, utc_from_ms(81).unwrap());
 
         // Estimation increases for the same point we evaluated above:
         // this happens because the remaining points lead to a interpolation that moves the estimated
@@ -409,7 +458,7 @@ mod test {
 
     #[test]
     fn use_percent() {
-        let (off, ts) = example_known_offsets();
+        let (off, ts) = example_tracked_offsets();
 
         let mut estimator = PartitionLagEstimator::new(10);
 
@@ -417,7 +466,7 @@ mod test {
         assert_eq!(estimator.usage_percent(), 0_f64);
         for (idx, offset) in off.iter().enumerate() {
             assert_eq!(estimator.usage_percent(), idx as f64 * 10_f64);
-            estimator.update(*offset, utc_from_ms(ts[idx]).unwrap());
+            estimator.update(1, *offset, utc_from_ms(ts[idx]).unwrap());
             assert_eq!(estimator.usage_percent(), (idx + 1) as f64 * 10_f64);
         }
         assert_eq!(estimator.usage_percent(), 80_f64);
@@ -428,7 +477,7 @@ mod test {
         assert_eq!(estimator.usage_percent(), 0_f64);
         for (idx, offset) in off.iter().enumerate() {
             assert_eq!(estimator.usage_percent(), ((idx) as f64 * 20_f64).min(100_f64));
-            estimator.update(*offset, utc_from_ms(ts[idx]).unwrap());
+            estimator.update(2, *offset, utc_from_ms(ts[idx]).unwrap());
             assert_eq!(estimator.usage_percent(), ((idx + 1) as f64 * 20_f64).min(100_f64));
         }
         assert_eq!(estimator.usage_percent(), 100_f64);
