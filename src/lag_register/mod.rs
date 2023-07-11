@@ -8,7 +8,7 @@ use tokio::sync::mpsc::Receiver;
 use crate::consumer_groups::ConsumerGroups;
 use crate::partition_offsets::PartitionOffsetsRegister;
 
-pub use register::LagRegister;
+pub use register::{GroupWithLag, Lag, LagRegister, LagWithOwner};
 
 pub fn init(
     cg_rx: Receiver<ConsumerGroups>,

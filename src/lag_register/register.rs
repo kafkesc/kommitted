@@ -11,11 +11,14 @@ use tokio::sync::{mpsc, RwLock};
 use crate::constants::KONSUMER_OFFSETS_KCL_CONSUMER;
 use crate::consumer_groups::ConsumerGroups;
 use crate::kafka_types::{Group, Member, TopicPartition};
-use crate::partition_offsets::{KnownOffset, PartitionOffsetsRegister};
+use crate::partition_offsets::{PartitionOffsetsRegister, TrackedOffset};
 
 /// Describes the "lag" (or "latency"), and it's usually paired with a Consumer [`GroupWithMembers`].
+///
+/// Additionally, it carries the "context" of the lag, including the offsets like the one
+/// it was measured against, the earliest and the latest (tracked and available).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) struct Lag {
+pub struct Lag {
     /// Offset that a given Consumer [`GroupWithMembers`] is at when consuming a specific [`TopicPartition`].
     pub(crate) offset: u64,
 
@@ -28,9 +31,13 @@ pub(crate) struct Lag {
     /// Estimated time latency between the Consumer [`GroupWithMembers`] consuming a specific [`TopicPartition`], and the [`DateTime<Utc>`] when the high watermark (end offset) was produced.
     pub(crate) time_lag: Duration,
 
-    pub(crate) earliest: KnownOffset,
+    pub(crate) earliest_available: u64,
 
-    pub(crate) latest: KnownOffset,
+    pub(crate) latest_available: u64,
+
+    pub(crate) earliest_tracked: TrackedOffset,
+
+    pub(crate) latest_tracked: TrackedOffset,
 }
 
 impl Default for Lag {
@@ -40,30 +47,32 @@ impl Default for Lag {
             offset_timestamp: DateTime::<Utc>::default(),
             offset_lag: 0,
             time_lag: Duration::zero(),
-            earliest: KnownOffset::default(),
-            latest: KnownOffset::default(),
+            earliest_available: u64::MIN,
+            latest_available: u64::MAX,
+            earliest_tracked: TrackedOffset::default(),
+            latest_tracked: TrackedOffset::default(),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub(crate) struct LagWithOwner {
-    lag: Option<Lag>,
-    owner: Option<Member>,
+pub struct LagWithOwner {
+    pub(crate) lag: Option<Lag>,
+    pub(crate) owner: Option<Member>,
 }
 
 /// Describes the "lag" (or "latency") of a specific Consumer [`GroupWithMembers`] in respect to a collection of [`TopicPartition`] that it consumes.
 #[derive(Debug, Clone, Default)]
 pub struct GroupWithLag {
-    group: Group,
+    pub(crate) group: Group,
     // TODO Wrap in a `RwLock` so we can modify a specific group lag,
     //   without holding a w-lock on the whole register
-    lag_by_topic_partition: HashMap<TopicPartition, LagWithOwner>,
+    pub(crate) lag_by_topic_partition: HashMap<TopicPartition, LagWithOwner>,
 }
 
 #[derive(Debug)]
 pub struct LagRegister {
-    lag_by_group: Arc<RwLock<HashMap<String, GroupWithLag>>>,
+    pub(crate) lag_by_group: Arc<RwLock<HashMap<String, GroupWithLag>>>,
 }
 
 impl LagRegister {
@@ -235,20 +244,31 @@ async fn process_offset_commit(
                         Duration::zero()
                     },
                 },
-                earliest: match po_reg.get_earliest_offset(&tp).await {
+                earliest_available: match po_reg.get_earliest_available_offset(&tp).await {
                     Ok(eo) => eo,
                     Err(e) => {
-                        error!("Unable to determine Earliest Offset for Topic Partition '{}': {}", tp, e);
+                        error!("Unable to determine Earliest Available Offset for Topic Partition '{}': {}", tp, e);
                         Default::default()
                     },
                 },
-                latest: match po_reg.get_latest_offset(&tp).await {
+                latest_available: match po_reg.get_latest_available_offset(&tp).await {
                     Ok(eo) => eo,
                     Err(e) => {
-                        error!(
-                            "Failed to estimate Time Lag of Group '{}' for Topic Partition '{}': {}",
-                            oc.group, tp, e
-                        );
+                        error!("Unable to determine Latest Available Offset for Topic Partition '{}': {}", tp, e);
+                        Default::default()
+                    },
+                },
+                earliest_tracked: match po_reg.get_earliest_tracked_offset(&tp).await {
+                    Ok(eo) => eo,
+                    Err(e) => {
+                        error!("Unable to determine Earliest Tracked Offset for Topic Partition '{}': {}", tp, e);
+                        Default::default()
+                    },
+                },
+                latest_tracked: match po_reg.get_latest_tracked_offset(&tp).await {
+                    Ok(eo) => eo,
+                    Err(e) => {
+                        error!("Unable to determine Latest Tracked Offset for Topic Partition '{}': {}", tp, e);
                         Default::default()
                     },
                 },
