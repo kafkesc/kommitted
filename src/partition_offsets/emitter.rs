@@ -13,7 +13,7 @@ use tokio_util::sync::CancellationToken;
 use crate::cluster_status::ClusterStatusRegister;
 use crate::internals::Emitter;
 
-const CHANNEL_SIZE: usize = 5;
+const CHANNEL_SIZE: usize = 1000;
 
 const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 const FETCH_INTERVAL: Duration = Duration::from_millis(20);
@@ -99,7 +99,7 @@ impl Emitter for PartitionOffsetsEmitter {
                                 };
 
                                 tokio::select! {
-                                    res = Self::emit_with_interval(&sx, po, &mut interval) => {
+                                    res = Self::emit(&sx, po) => {
                                         if let Err(e) = res {
                                             error!("Failed to emit {}: {e}", std::any::type_name::<PartitionOffset>());
                                         }
@@ -115,6 +115,17 @@ impl Emitter for PartitionOffsetsEmitter {
                             },
                         }
                     }
+                }
+
+                // Wait for next "tick", or get interrupted by shutdown
+                tokio::select! {
+                    _ = interval.tick() => {
+                        // No-op
+                    },
+                    _ = shutdown_token.cancelled() => {
+                        info!("Shutting down");
+                        break 'outer;
+                    },
                 }
             }
         });
