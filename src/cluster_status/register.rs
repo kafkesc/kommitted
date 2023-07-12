@@ -15,7 +15,7 @@ pub struct ClusterStatusRegister {
 }
 
 impl ClusterStatusRegister {
-    pub fn new(mut rx: Receiver<ClusterStatus>) -> Self {
+    pub fn new(cluster_id_override: Option<String>, mut rx: Receiver<ClusterStatus>) -> Self {
         let csr = Self {
             latest_status: Arc::new(RwLock::new(None)),
         };
@@ -35,18 +35,20 @@ impl ClusterStatusRegister {
 
             loop {
                 tokio::select! {
-                    Some(cs) = rx.recv() => {
+                    Some(mut cs) = rx.recv() => {
                         trace!("Received:\n{:#?}", cs);
 
-                        let t_len = cs.topics.len();
-                        let b_len = cs.brokers.len();
+                        // Override cluster identifier, if present
+                        if let Some(c_id_over) = &cluster_id_override {
+                            cs.id = c_id_over.to_string();
+                        }
+
+                        info!(
+                            "Updated cluster status: {:?} cluster.id, {} topics, {} brokers",
+                            cs.id, cs.topics.len(), cs.brokers.len()
+                        );
 
                         *(latest_status_arc_clone.write().await) = Some(cs);
-
-                        debug!(
-                            "Updated cluster status: {} topics, {} brokers",
-                            t_len, b_len
-                        );
                     },
                     else => {
                         info!("Emitters stopping: breaking (internal) loop");
@@ -57,6 +59,15 @@ impl ClusterStatusRegister {
         });
 
         csr
+    }
+
+    /// Current identifier of the Kafka cluster.
+    #[allow(unused)] // TODO Remove
+    pub async fn get_cluster_id(&self) -> String {
+        match &*(self.latest_status.read().await) {
+            None => super::emitter::CLUSTER_ID_NONE.to_string(),
+            Some(cs) => cs.id.clone(),
+        }
     }
 
     /// Current Topics present in the Kafka cluster.
@@ -80,7 +91,7 @@ impl ClusterStatusRegister {
     }
 
     /// Current Brokers constituting the Kafka cluster.
-    #[allow(dead_code)]
+    #[allow(unused)] // TODO Remove
     pub async fn get_brokers(&self) -> Vec<Broker> {
         match &*(self.latest_status.read().await) {
             None => Vec::new(),

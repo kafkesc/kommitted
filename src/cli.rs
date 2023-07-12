@@ -38,6 +38,12 @@ pub struct Cli {
     pub kafka_config: Vec<KVPair>,
 
     /// For each Topic Partition, how much history of offsets to keep in memory.
+    /// Override identifier of the monitored Kafka Cluster.
+    ///
+    /// If set, it replaces the value `cluster.id` from the Brokers' configuration.
+    /// This can be useful when `cluster.id` is not actually set.
+    #[arg(long = "cluster-id", value_name = "CLUSTER_ID")]
+    pub cluster_id: Option<String>,
     ///
     /// Offsets data points are collected _at best every second_.
     /// Once this limit is reached, the oldest data points are discarded, realising

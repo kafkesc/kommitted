@@ -15,9 +15,15 @@ const CHANNEL_SIZE: usize = 5;
 const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 const FETCH_INTERVAL: Duration = Duration::from_secs(60);
 
+pub const CLUSTER_ID_NONE: &str = "__none__";
+
 /// This is a `Send`-able struct to carry Kafka Cluster status across thread boundaries.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct ClusterStatus {
+    /// Cluster identifier, defined as `cluster.id` in Brokers' configuration.
+    /// It will be `__none__` if not set on Brokers.
+    pub id: String,
+
     /// A vector of [`TopicPartitionsStatus`].
     ///
     /// It reflects the status of Topics (and Partitions) as reported by the Kafka cluster.
@@ -29,9 +35,10 @@ pub struct ClusterStatus {
     pub brokers: Vec<Broker>,
 }
 
-impl From<Metadata> for ClusterStatus {
-    fn from(m: Metadata) -> Self {
+impl ClusterStatus {
+    fn from(id: Option<String>, m: Metadata) -> Self {
         Self {
+            id: id.unwrap_or_else(|| CLUSTER_ID_NONE.to_string()),
             topics: m.topics().iter().map(TopicPartitionsStatus::from).collect(),
             brokers: m.brokers().iter().map(Broker::from).collect(),
         }
@@ -84,10 +91,12 @@ impl Emitter for ClusterStatusEmitter {
         let join_handle = tokio::spawn(async move {
             let mut interval = interval(FETCH_INTERVAL);
 
-            'outer: loop {
-                let res_status = admin_client.inner().fetch_metadata(None, FETCH_TIMEOUT).map(Self::Emitted::from);
-
-                match res_status {
+            loop {
+                match admin_client
+                    .inner()
+                    .fetch_metadata(None, FETCH_TIMEOUT)
+                    .map(|m| Self::Emitted::from(admin_client.inner().fetch_cluster_id(FETCH_TIMEOUT), m))
+                {
                     Ok(status) => {
                         tokio::select! {
                             res = Self::emit_with_interval(&sx, status, &mut interval) => {
@@ -97,7 +106,7 @@ impl Emitter for ClusterStatusEmitter {
                             },
                             _ = shutdown_token.cancelled() => {
                                 info!("Shutting down");
-                                break 'outer;
+                                break;
                             },
                         }
                     },

@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let shutdown_token = build_shutdown_token();
 
     // Init `cluster_status` module
-    let (cs_reg, cs_join) = cluster_status::init(admin_client_config.clone(), shutdown_token.clone());
+    let (cs_reg, cs_join) = cluster_status::init(admin_client_config.clone(), cli.cluster_id, shutdown_token.clone());
 
     // Init `partition_offsets` module
     let (po_reg, po_join) = partition_offsets::init(
