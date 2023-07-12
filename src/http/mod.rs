@@ -72,10 +72,17 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
     // As defined by Prometheus: https://github.com/prometheus/docs/blob/main/content/docs/instrumenting/exposition_formats.md#basic-info
     headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("text/plain; version=0.0.4"));
 
-    // TODO Determine a good capacity in advance
-    //   Given the number of topic partitions
-    //   multiple for the number of metrics we create per topic-partition
-    let mut metrics_vec: Vec<String> = Vec::with_capacity(100);
+    // Allocate a Vector of Strings to build the body of the output.
+    // The capacity is pre-calculated to try to do as little mem-alloc as possible.
+    //
+    // The capacity is necessarily a function of the number of metric types produced,
+    // and the number of topic partitions.
+    let tp_count: usize =
+        state.lag_reg.lag_by_group.read().await.iter().map(|(_, gwl)| gwl.lag_by_topic_partition.len()).sum();
+    let metric_types_count: usize = 3;
+    let headers_footers_count: usize = metric_types_count * 2;
+    let metrics_count: usize = tp_count * metric_types_count;
+    let mut metrics_vec: Vec<String> = Vec::with_capacity(metrics_count + headers_footers_count);
 
     // ----------------------------------------------------------- METRIC: consumer_partition_offset
     metrics::consumer_partition_offset::append_headers(&mut metrics_vec);
