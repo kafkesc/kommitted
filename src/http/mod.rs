@@ -1,6 +1,3 @@
-// TODO Re-enable clippy
-#![allow(clippy::all)]
-
 mod metrics;
 
 use std::{net::SocketAddr, sync::Arc};

@@ -5,10 +5,9 @@ use crate::lag_register::Lag;
 
 use super::{normalize_owner_data, HEADER_HELP, HEADER_TYPE, TYPE_COUNTER};
 
-const NAME: &'static str = "kcl_kafka_consumer_partition_offset";
-const HELP: &'static str =
-    formatcp!("{HEADER_HELP} {NAME} The last consumed offset by the consumer of the topic partition.");
-const TYPE: &'static str = formatcp!("{HEADER_TYPE} {NAME} {TYPE_COUNTER}");
+const NAME: &str = "kcl_kafka_consumer_partition_offset";
+const HELP: &str = formatcp!("{HEADER_HELP} {NAME} The last consumed offset by the consumer of the topic partition.");
+const TYPE: &str = formatcp!("{HEADER_TYPE} {NAME} {TYPE_COUNTER}");
 
 pub(in super::super) fn append_headers(res: &mut Vec<String>) {
     res.push(HELP.into());

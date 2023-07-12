@@ -4,13 +4,13 @@ pub mod consumer_partition_offset;
 
 use crate::kafka_types::Member;
 
-pub(self) const UNKNOWN_VAL: &'static str = "UNKNOWN";
+pub(self) const UNKNOWN_VAL: &str = "UNKNOWN";
 
-pub(self) const TYPE_COUNTER: &'static str = "counter";
-pub(self) const TYPE_GAUGE: &'static str = "gauge";
+pub(self) const TYPE_COUNTER: &str = "counter";
+pub(self) const TYPE_GAUGE: &str = "gauge";
 
-pub(self) const HEADER_HELP: &'static str = "# HELP";
-pub(self) const HEADER_TYPE: &'static str = "# TYPE";
+pub(self) const HEADER_HELP: &str = "# HELP";
+pub(self) const HEADER_TYPE: &str = "# TYPE";
 
 pub(self) fn normalize_owner_data(opt_owner: Option<&Member>) -> (&str, &str, &str) {
     if let Some(o) = opt_owner {
