@@ -62,7 +62,6 @@ impl ClusterStatusRegister {
     }
 
     /// Current identifier of the Kafka cluster.
-    #[allow(unused)] // TODO Remove
     pub async fn get_cluster_id(&self) -> String {
         match &*(self.latest_status.read().await) {
             None => super::emitter::CLUSTER_ID_NONE.to_string(),

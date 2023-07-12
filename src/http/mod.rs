@@ -5,6 +5,7 @@ mod metrics;
 
 use std::{net::SocketAddr, sync::Arc};
 
+use crate::cluster_status::ClusterStatusRegister;
 use axum::{
     extract::State,
     http::{header, HeaderMap, HeaderValue, StatusCode},
@@ -28,11 +29,13 @@ use crate::lag_register::LagRegister;
 
 #[derive(Clone)]
 struct HttpServiceState {
+    cs_reg: Arc<ClusterStatusRegister>,
     lag_reg: Arc<LagRegister>,
 }
 
-pub async fn init(lag_reg: Arc<LagRegister>, shutdown_token: CancellationToken) {
+pub async fn init(cs_reg: Arc<ClusterStatusRegister>, lag_reg: Arc<LagRegister>, shutdown_token: CancellationToken) {
     let state = HttpServiceState {
+        cs_reg,
         lag_reg,
     };
 
@@ -59,15 +62,12 @@ async fn root() -> &'static str {
     "Hello, World!"
 }
 
-// TODO expose the ID of the cluster (as `cluster_id`) as a way to differentiate metrics coming
-//   from different Kafka clusters into the same Prometheus.
-//   This might be just echoing a Command Line argument set by the user, if the `cluster_id` can't
-//   be procured by querying the cluster itself.
-const TODO_CLUSTER_ID: &'static str = "TODO";
-
 async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoResponse {
     let status = StatusCode::OK;
     let mut headers = HeaderMap::new();
+
+    // Procure the Cluster ID once and reuse it in all metrics that get generated
+    let cluster_id = state.cs_reg.get_cluster_id().await;
 
     // As defined by Prometheus: https://github.com/prometheus/docs/blob/main/content/docs/instrumenting/exposition_formats.md#basic-info
     headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("text/plain; version=0.0.4"));
@@ -82,7 +82,7 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
     for (g, gwl) in state.lag_reg.lag_by_group.read().await.iter() {
         for (tp, lwo) in gwl.lag_by_topic_partition.iter() {
             metrics::consumer_partition_offset::append_metric(
-                TODO_CLUSTER_ID,
+                &cluster_id,
                 g,
                 tp.topic.as_ref(),
                 tp.partition,
@@ -99,7 +99,7 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
     for (g, gwl) in state.lag_reg.lag_by_group.read().await.iter() {
         for (tp, lwo) in gwl.lag_by_topic_partition.iter() {
             metrics::consumer_partition_lag_offset::append_metric(
-                TODO_CLUSTER_ID,
+                &cluster_id,
                 g,
                 tp.topic.as_ref(),
                 tp.partition,
@@ -116,7 +116,7 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
     for (g, gwl) in state.lag_reg.lag_by_group.read().await.iter() {
         for (tp, lwo) in gwl.lag_by_topic_partition.iter() {
             metrics::consumer_partition_lag_milliseconds::append_metric(
-                TODO_CLUSTER_ID,
+                &cluster_id,
                 g,
                 tp.topic.as_ref(),
                 tp.partition,

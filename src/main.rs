@@ -29,12 +29,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Init `cluster_status` module
     let (cs_reg, cs_join) = cluster_status::init(admin_client_config.clone(), cli.cluster_id, shutdown_token.clone());
+    let cs_reg_arc = Arc::new(cs_reg);
 
     // Init `partition_offsets` module
     let (po_reg, po_join) = partition_offsets::init(
         admin_client_config.clone(),
         cli.offsets_history,
-        Arc::new(cs_reg),
+        cs_reg_arc.clone(),
         shutdown_token.clone(),
     );
     // Await for the Partition Offset register to be ready
@@ -54,7 +55,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let lag_reg_arc = Arc::new(lag_reg);
 
     // Init `http` module
-    let http_fut = http::init(lag_reg_arc.clone(), shutdown_token.clone());
+    let http_fut = http::init(cs_reg_arc.clone(), lag_reg_arc.clone(), shutdown_token.clone());
 
     // Join all the async tasks, then let it terminate
     let _ = tokio::join!(cs_join, po_join, kod_join, cg_join, http_fut);
