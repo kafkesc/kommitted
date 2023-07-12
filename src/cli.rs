@@ -37,15 +37,19 @@ pub struct Cli {
     )]
     pub kafka_config: Vec<KVPair>,
 
-    /// For each Topic Partition, how much history of offsets to keep in memory.
     /// Override identifier of the monitored Kafka Cluster.
     ///
     /// If set, it replaces the value `cluster.id` from the Brokers' configuration.
     /// This can be useful when `cluster.id` is not actually set.
     #[arg(long = "cluster-id", value_name = "CLUSTER_ID")]
     pub cluster_id: Option<String>,
+
+    /// For each Topic Partition, how much history of offsets to track in memory.
     ///
-    /// Offsets data points are collected _at best every second_.
+    /// Offsets data points are collected every 500ms, on average: so, on average,
+    /// 30 minutes of data points is 3600 offsets, assuming partition offsets are
+    /// regularly produced to.
+    ///
     /// Once this limit is reached, the oldest data points are discarded, realising
     /// a "moving window" of offsets history.
     #[arg(long = "history", value_name = "SIZE", default_value = "3600", verbatim_doc_comment)]
