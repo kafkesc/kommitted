@@ -79,55 +79,22 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
     let metric_types_count: usize = 3;
     let headers_footers_count: usize = metric_types_count * 2;
     let metrics_count: usize = tp_count * metric_types_count;
-    let mut metrics_vec: Vec<String> = Vec::with_capacity(metrics_count + headers_footers_count);
+    let mut body: Vec<String> = Vec::with_capacity(metrics_count + headers_footers_count);
 
     // ----------------------------------------------------------- METRIC: consumer_partition_offset
-    metrics::consumer_partition_offset::append_headers(&mut metrics_vec);
-    for (g, gwl) in state.lag_reg.lag_by_group.read().await.iter() {
-        for (tp, lwo) in gwl.lag_by_topic_partition.iter() {
-            metrics::consumer_partition_offset::append_metric(
-                &cluster_id,
-                g,
-                tp.topic.as_ref(),
-                tp.partition,
-                lwo.owner.as_ref(),
-                lwo.lag.as_ref(),
-                &mut metrics_vec,
-            );
-        }
-    }
-    metrics_vec.push(String::new());
+    consumer_partition_offset::append_headers(&mut body);
+    iter_lag_reg(&state.lag_reg, &mut body, &cluster_id, consumer_partition_offset::append_metric).await;
+    body.push(String::new());
 
     // ------------------------------------------------------- METRIC: consumer_partition_lag_offset
-    metrics::consumer_partition_lag_offset::append_headers(&mut metrics_vec);
-    for (g, gwl) in state.lag_reg.lag_by_group.read().await.iter() {
-        for (tp, lwo) in gwl.lag_by_topic_partition.iter() {
-            metrics::consumer_partition_lag_offset::append_metric(
-                &cluster_id,
-                g,
-                tp.topic.as_ref(),
-                tp.partition,
-                lwo.owner.as_ref(),
-                lwo.lag.as_ref(),
-                &mut metrics_vec,
-            );
-        }
-    }
-    metrics_vec.push(String::new());
+    consumer_partition_lag_offset::append_headers(&mut body);
+    iter_lag_reg(&state.lag_reg, &mut body, &cluster_id, consumer_partition_lag_offset::append_metric).await;
+    body.push(String::new());
 
     // ------------------------------------------------- METRIC: consumer_partition_lag_milliseconds
-    metrics::consumer_partition_lag_milliseconds::append_headers(&mut metrics_vec);
-    for (g, gwl) in state.lag_reg.lag_by_group.read().await.iter() {
-        for (tp, lwo) in gwl.lag_by_topic_partition.iter() {
-            metrics::consumer_partition_lag_milliseconds::append_metric(
-                &cluster_id,
-                g,
-                tp.topic.as_ref(),
-                tp.partition,
-                lwo.owner.as_ref(),
-                lwo.lag.as_ref(),
-                &mut metrics_vec,
-            );
+    consumer_partition_lag_milliseconds::append_headers(&mut body);
+    iter_lag_reg(&state.lag_reg, &mut body, &cluster_id, consumer_partition_lag_milliseconds::append_metric).await;
+    body.push(String::new());
         }
     }
     metrics_vec.push(String::new());
@@ -181,5 +148,5 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
     //   HELP: Time taken to fetch earliest/latest (watermark) offsets of all the topic partitions of the cluster.
     //   LABELS: cluster_id?
 
-    (status, headers, metrics_vec.join("\n"))
+    (status, headers, body.join("\n"))
 }
