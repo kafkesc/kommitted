@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::{mpsc::Receiver, RwLock};
 
 use super::emitter::ClusterStatus;
-use crate::kafka_types::Broker;
+use crate::kafka_types::{Broker, TopicPartition};
 
 /// Registers and exposes the latest [`ClusterStatus`].
 ///
@@ -82,10 +82,28 @@ impl ClusterStatusRegister {
     /// # Arguments
     ///
     /// * `topic` - Topics we want to know the Partitions of.
-    pub async fn get_topic_partitions(&self, topic: &str) -> Option<Vec<u32>> {
+    pub async fn get_partitions_for_topic(&self, topic: &str) -> Option<Vec<u32>> {
         match &*(self.latest_status.read().await) {
             None => None,
             Some(cs) => cs.topics.iter().find(|t| t.name == topic).map(|t| t.partitions.iter().map(|p| p.id).collect()),
+        }
+    }
+
+    /// Current [`TopicPartition`]s in the Kafka cluster.
+    pub async fn get_topic_partitions(&self) -> Vec<TopicPartition> {
+        match &*(self.latest_status.read().await) {
+            None => Vec::new(),
+            Some(cs) => cs
+                .topics
+                .iter()
+                .flat_map(|tps| {
+                    let t = tps.name.clone();
+                    tps.partitions
+                        .iter()
+                        .map(|ps| TopicPartition::new(t.clone(), ps.id))
+                        .collect::<Vec<TopicPartition>>()
+                })
+                .collect(),
         }
     }
 

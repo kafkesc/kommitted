@@ -87,7 +87,7 @@ impl Emitter for PartitionOffsetsEmitter {
                 for t in csr.get_topics().await {
                     trace!("Fetching earliest/latest offset for Partitions of Topic '{}'", t);
 
-                    for p in csr.get_topic_partitions(t.as_str()).await.unwrap_or_default() {
+                    for p in csr.get_partitions_for_topic(t.as_str()).await.unwrap_or_default() {
                         match admin_client.inner().fetch_watermarks(t.as_str(), p as i32, FETCH_TIMEOUT) {
                             Ok((earliest, latest)) => {
                                 let po = PartitionOffset {
