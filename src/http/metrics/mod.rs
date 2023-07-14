@@ -7,6 +7,7 @@ use crate::lag_register::{Lag, LagRegister};
 
 pub(self) const UNKNOWN_VAL: &str = "UNKNOWN";
 
+#[allow(unused)]
 pub(self) const TYPE_COUNTER: &str = "counter";
 pub(self) const TYPE_GAUGE: &str = "gauge";
 
