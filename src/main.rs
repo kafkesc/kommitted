@@ -43,6 +43,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         warn!("Terminated before {} was ready", std::any::type_name::<PartitionOffsetsRegister>());
         std::process::exit(exit_code::SERVICE_UNAVAILABLE);
     }
+    let po_reg_arc = Arc::new(po_reg);
 
     // Init `konsumer_offsets_data` module
     let (kod_rx, kod_join) = konsumer_offsets_data::init(admin_client_config.clone(), shutdown_token.clone());
@@ -51,11 +52,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let (cg_rx, cg_join) = consumer_groups::init(admin_client_config.clone(), shutdown_token.clone());
 
     // Init `lag_register` module
-    let lag_reg = lag_register::init(cg_rx, kod_rx, Arc::new(po_reg));
+    let lag_reg = lag_register::init(cg_rx, kod_rx, po_reg_arc.clone());
     let lag_reg_arc = Arc::new(lag_reg);
 
     // Init `http` module
-    let http_fut = http::init(cs_reg_arc.clone(), lag_reg_arc.clone(), shutdown_token.clone());
+    let http_fut = http::init(cs_reg_arc.clone(), po_reg_arc.clone(), lag_reg_arc.clone(), shutdown_token.clone());
 
     // Join all the async tasks, then let it terminate
     let _ = tokio::join!(cs_join, po_join, kod_join, cg_join, http_fut);

@@ -1,6 +1,10 @@
 pub mod consumer_partition_lag_milliseconds;
 pub mod consumer_partition_lag_offset;
 pub mod consumer_partition_offset;
+pub mod partition_earliest_available_offset;
+pub mod partition_earliest_tracked_offset;
+pub mod partition_latest_available_offset;
+pub mod partition_latest_tracked_offset;
 
 use crate::kafka_types::Member;
 use crate::lag_register::{Lag, LagRegister};

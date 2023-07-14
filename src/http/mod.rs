@@ -2,7 +2,6 @@ mod metrics;
 
 use std::{net::SocketAddr, sync::Arc};
 
-use crate::cluster_status::ClusterStatusRegister;
 use axum::{
     extract::State,
     http::{header, HeaderMap, HeaderValue, StatusCode},
@@ -12,7 +11,11 @@ use axum::{
 };
 use tokio_util::sync::CancellationToken;
 
+use crate::cluster_status::ClusterStatusRegister;
 use crate::lag_register::LagRegister;
+
+use crate::partition_offsets::PartitionOffsetsRegister;
+use metrics::*;
 
 // TODO HTTP Endpoints
 //   /                Landing page
@@ -27,12 +30,19 @@ use crate::lag_register::LagRegister;
 #[derive(Clone)]
 struct HttpServiceState {
     cs_reg: Arc<ClusterStatusRegister>,
+    po_reg: Arc<PartitionOffsetsRegister>,
     lag_reg: Arc<LagRegister>,
 }
 
-pub async fn init(cs_reg: Arc<ClusterStatusRegister>, lag_reg: Arc<LagRegister>, shutdown_token: CancellationToken) {
+pub async fn init(
+    cs_reg: Arc<ClusterStatusRegister>,
+    po_reg: Arc<PartitionOffsetsRegister>,
+    lag_reg: Arc<LagRegister>,
+    shutdown_token: CancellationToken,
+) {
     let state = HttpServiceState {
         cs_reg,
+        po_reg,
         lag_reg,
     };
 
@@ -66,6 +76,9 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
     // Procure the Cluster ID once and reuse it in all metrics that get generated
     let cluster_id = state.cs_reg.get_cluster_id().await;
 
+    // Procure the TopicPartitions once and reuse it in all metrics that need it
+    let tps = state.cs_reg.get_topic_partitions().await;
+
     // As defined by Prometheus: https://github.com/prometheus/docs/blob/main/content/docs/instrumenting/exposition_formats.md#basic-info
     headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("text/plain; version=0.0.4"));
 
@@ -95,27 +108,83 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
     consumer_partition_lag_milliseconds::append_headers(&mut body);
     iter_lag_reg(&state.lag_reg, &mut body, &cluster_id, consumer_partition_lag_milliseconds::append_metric).await;
     body.push(String::new());
+
+    // ------------------------------------------------- METRIC: partition_earliest_available_offset
+    partition_earliest_available_offset::append_headers(&mut body);
+    for tp in tps.iter() {
+        match state.po_reg.get_earliest_available_offset(tp).await {
+            Ok(eao) => {
+                partition_earliest_available_offset::append_metric(
+                    &cluster_id,
+                    &tp.topic,
+                    tp.partition,
+                    eao,
+                    &mut body,
+                );
+            },
+            Err(e) => {
+                warn!("Unable to generate 'partition_earliest_available_offset': {e}");
+            },
         }
     }
-    metrics_vec.push(String::new());
+    body.push(String::new());
 
-    //
-    //
-    // TODO `kcl_kafka_consumer_partition_earliest_available_offset` NO TIMESTAMP
-    //   LABELS: cluster_id?, topic, partition, member_id, member_host, member_client_id
-    //   HELP: Earliest consumable offset available to consumers of the given topic partition.
-    //
-    // TODO `kcl_kafka_consumer_partition_latest_available_offset` NO TIMESTAMP
-    //   LABELS: cluster_id?, topic, partition, member_id, member_host, member_client_id
-    //   HELP: Latest consumable offset available to consumers of the given topic partition.
-    //
-    // TODO `kcl_kafka_consumer_partition_earliest_tracked_offset`
-    //   LABELS: cluster_id?, group, topic, partition, member_id, member_host, member_client_id
-    //   HELP: Earliest tracked offset, used to estimate time lag of the given group for this specific topic partition.
-    //
-    // TODO `kcl_kafka_consumer_partition_latest_tracked_offset`
-    //   LABELS: cluster_id?, group, topic, partition, member_id, member_host, member_client_id
-    //   HELP: Latest tracked offset, used to estimate time lag of the given group for this specific topic partition.
+    // ------------------------------------------------- METRIC: partition_latest_available_offset
+    partition_latest_available_offset::append_headers(&mut body);
+    for tp in tps.iter() {
+        match state.po_reg.get_latest_available_offset(tp).await {
+            Ok(lao) => {
+                partition_latest_available_offset::append_metric(&cluster_id, &tp.topic, tp.partition, lao, &mut body);
+            },
+            Err(e) => {
+                warn!("Unable to generate 'partition_latest_available_offset': {e}");
+            },
+        }
+    }
+    body.push(String::new());
+
+    // ------------------------------------------------- METRIC: partition_earliest_tracked_offset
+    partition_earliest_tracked_offset::append_headers(&mut body);
+    for tp in tps.iter() {
+        match state.po_reg.get_earliest_tracked_offset(tp).await {
+            Ok(eto) => {
+                partition_earliest_tracked_offset::append_metric(
+                    &cluster_id,
+                    &tp.topic,
+                    tp.partition,
+                    eto.offset,
+                    eto.at.timestamp_millis(),
+                    &mut body,
+                );
+            },
+            Err(e) => {
+                warn!("Unable to generate 'partition_earliest_tracked_offset': {e}");
+            },
+        }
+    }
+    body.push(String::new());
+
+    // ------------------------------------------------- METRIC: partition_latest_tracked_offset
+    partition_latest_tracked_offset::append_headers(&mut body);
+    for tp in tps.iter() {
+        match state.po_reg.get_latest_tracked_offset(tp).await {
+            Ok(lto) => {
+                partition_latest_tracked_offset::append_metric(
+                    &cluster_id,
+                    &tp.topic,
+                    tp.partition,
+                    lto.offset,
+                    lto.at.timestamp_millis(),
+                    &mut body,
+                );
+            },
+            Err(e) => {
+                warn!("Unable to generate 'partition_latest_tracked_offset': {e}");
+            },
+        }
+    }
+    body.push(String::new());
+
     //
     // --- CLUSTER METRICS ---
     //
