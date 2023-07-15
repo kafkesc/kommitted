@@ -1,9 +1,10 @@
 use async_trait::async_trait;
 use rdkafka::{
     consumer::{Consumer, StreamConsumer},
-    ClientConfig, Message,
+    error::KafkaResult,
+    ClientConfig, Message, Offset,
 };
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::{sync::mpsc, task::JoinHandle, time::Duration};
 use tokio_util::sync::CancellationToken;
 
 use konsumer_offsets::KonsumerOffsetsData;
@@ -11,7 +12,7 @@ use konsumer_offsets::KonsumerOffsetsData;
 use crate::constants::{KONSUMER_OFFSETS_DATA_TOPIC, KONSUMER_OFFSETS_KCL_CONSUMER};
 use crate::internals::Emitter;
 
-const CHANNEL_SIZE: usize = 1000;
+const CHANNEL_SIZE: usize = 2000;
 
 /// Emits [`KonsumerOffsetsData`] via a provided [`mpsc::channel`].
 ///
@@ -32,6 +33,7 @@ impl KonsumerOffsetsDataEmitter {
 
     fn set_kafka_config(mut client_config: ClientConfig) -> ClientConfig {
         client_config.set("enable.auto.commit", "true");
+        client_config.set("auto.commit.interval.ms", "5000");
         client_config.set("auto.offset.reset", "earliest");
         if client_config.get("group.id").is_none() {
             client_config.set("group.id", KONSUMER_OFFSETS_KCL_CONSUMER);
@@ -56,31 +58,24 @@ impl Emitter for KonsumerOffsetsDataEmitter {
     /// * `shutdown_token`: A [`CancellationToken`] that, when cancelled, will make the internal loop terminate.
     ///
     fn spawn(&self, shutdown_token: CancellationToken) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
-        let config = Self::set_kafka_config(self.consumer_client_config.clone());
-
-        let consumer_client: StreamConsumer = config.create().expect("Failed to create Consumer Client");
-
-        consumer_client
-            .subscribe(&[KONSUMER_OFFSETS_DATA_TOPIC])
-            .unwrap_or_else(|_| panic!("Failed to subscribe to '{}'", KONSUMER_OFFSETS_DATA_TOPIC));
-
-        // TODO
-        //   1. Define configuration/logic to start the read of the topic from "earliest" or
-        //   from X hours ago?
-        //   2. Seek to that point for all topic/partition/offset triplets
-        //   3. Begin consumption
+        let consumer_client: StreamConsumer = Self::set_kafka_config(self.consumer_client_config.clone())
+            .create()
+            .expect("Failed to create Consumer Client");
 
         let (sx, rx) = mpsc::channel::<KonsumerOffsetsData>(CHANNEL_SIZE);
 
         let join_handle = tokio::spawn(async move {
+            match subscribe_and_seek_to_beginning(&consumer_client, KONSUMER_OFFSETS_DATA_TOPIC).await {
+                Ok(_) => info!("Subscribed to {KONSUMER_OFFSETS_DATA_TOPIC} and sought to beginning"),
+                Err(e) => panic!("Failed to subscribe and seek to beginning '{KONSUMER_OFFSETS_DATA_TOPIC}': {e}"),
+            }
+
             loop {
                 tokio::select! {
                     r_msg = consumer_client.recv() => {
                         match r_msg {
                             Ok(m) => {
-                                let res_kod = konsumer_offsets::KonsumerOffsetsData::try_from_bytes(m.key(), m.payload());
-
-                                match res_kod {
+                                match konsumer_offsets::KonsumerOffsetsData::try_from_bytes(m.key(), m.payload()) {
                                     Ok(kod) => {
                                         if let Err(e) = Self::emit(&sx, kod).await {
                                             error!("Failed to emit {}: {e}", std::any::type_name::<KonsumerOffsetsData>());
@@ -106,4 +101,22 @@ impl Emitter for KonsumerOffsetsDataEmitter {
 
         (rx, join_handle)
     }
+}
+
+async fn subscribe_and_seek_to_beginning(consumer: &StreamConsumer, topic: &str) -> KafkaResult<()> {
+    // Subscribe to topic: note, the actual subscription is finalized only later
+    consumer.subscribe(&[topic])?;
+
+    // Wait for messages to start coming in.
+    // Once the first message is received, subscription has happened
+    let _ = consumer.recv().await?;
+
+    // Fetch the current position of all the subscribed partitions
+    let mut subscriptions = consumer.position()?;
+
+    // Seek back to the beginning all the subscribed partitions
+    subscriptions.set_all_offsets(Offset::Beginning)?;
+    consumer.seek_partitions(subscriptions, Duration::from_secs(5))?;
+
+    Ok(())
 }
