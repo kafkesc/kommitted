@@ -28,7 +28,7 @@ pub(in super::super) fn append_metric(
     let (offset, offset_timestamp_utc_ms) = if let Some(l) = lag {
         (l.offset, l.offset_timestamp.timestamp_millis())
     } else {
-        (u64::MIN, -1)
+        (0, -1)
     };
 
     res.push(format!(
