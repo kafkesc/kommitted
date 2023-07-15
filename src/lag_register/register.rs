@@ -5,7 +5,7 @@ use std::{
 
 use chrono::{DateTime, Duration, Utc};
 use konsumer_offsets::{GroupMetadata, KonsumerOffsetsData, OffsetCommit};
-use log::Level::{Debug, Trace};
+use log::Level::Trace;
 use tokio::sync::{mpsc, RwLock};
 
 use crate::constants::KONSUMER_OFFSETS_KCL_CONSUMER;
@@ -100,20 +100,16 @@ impl LagRegister {
                     }
                 }
 
-                if log_enabled!(Debug) {
+                if log_enabled!(Trace) {
                     let r_guard = lag_by_group_clone.read().await;
                     for (name, gwl) in r_guard.iter() {
-                        if log_enabled!(Trace) {
-                            trace!("{:#?}", gwl);
-                        } else {
-                            debug!(
-                                "Group {} has Lag info for {} partitions: {} Lags, {} Owners",
-                                name,
-                                gwl.lag_by_topic_partition.len(),
-                                gwl.lag_by_topic_partition.iter().filter(|x| x.1.lag.is_some()).count(),
-                                gwl.lag_by_topic_partition.iter().filter(|x| x.1.owner.is_some()).count(),
-                            );
-                        }
+                        trace!(
+                            "Group {} has Lag info for {} partitions: {} Lags, {} Owners",
+                            name,
+                            gwl.lag_by_topic_partition.len(),
+                            gwl.lag_by_topic_partition.iter().filter(|x| x.1.lag.is_some()).count(),
+                            gwl.lag_by_topic_partition.iter().filter(|x| x.1.owner.is_some()).count(),
+                        );
                     }
                 }
             }
