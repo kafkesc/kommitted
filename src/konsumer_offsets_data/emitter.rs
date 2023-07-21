@@ -1,13 +1,14 @@
 use async_trait::async_trait;
+use konsumer_offsets::KonsumerOffsetsData;
+use rdkafka::error::KafkaError;
 use rdkafka::{
-    consumer::{Consumer, StreamConsumer},
+    config::RDKafkaLogLevel,
+    consumer::{Consumer, ConsumerContext, Rebalance, StreamConsumer},
     error::KafkaResult,
-    ClientConfig, Message, Offset,
+    ClientConfig, ClientContext, Message, Offset, TopicPartitionList,
 };
 use tokio::{sync::mpsc, task::JoinHandle, time::Duration};
 use tokio_util::sync::CancellationToken;
-
-use konsumer_offsets::KonsumerOffsetsData;
 
 use crate::constants::{KONSUMER_OFFSETS_DATA_TOPIC, KONSUMER_OFFSETS_KCL_CONSUMER};
 use crate::internals::Emitter;
@@ -31,17 +32,89 @@ impl KonsumerOffsetsDataEmitter {
         }
     }
 
-    fn set_kafka_config(mut client_config: ClientConfig) -> ClientConfig {
+    /// Sets the desired Kafka Configuration on the given [`ClientConfig`] object.
+    ///
+    /// Ref: https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md.
+    fn set_kafka_consumer_config(mut client_config: ClientConfig) -> ClientConfig {
         client_config.set("enable.auto.commit", "true");
         client_config.set("auto.commit.interval.ms", "5000");
+        client_config.set("session.timeout.ms", "10000"); //< must be greater than `auto.commit.interval.ms`
         client_config.set("auto.offset.reset", "earliest");
+        client_config.set("enable.partition.eof", "false");
+
         if client_config.get("group.id").is_none() {
             client_config.set("group.id", KONSUMER_OFFSETS_KCL_CONSUMER);
         }
 
+        client_config.set_log_level(RDKafkaLogLevel::Warning);
+
         client_config
     }
+
+    async fn assign_and_seek_to_earliest_all_partitions(
+        consumer: &KonsumerOffsetsDataConsumer,
+        topic: &str,
+    ) -> KafkaResult<()> {
+        // Fetch topic metadata
+        let meta = consumer.fetch_metadata(Some(topic), Duration::from_secs(5))?;
+        let topic_meta = meta.topics().get(0).ok_or(KafkaError::Subscription(format!(
+            "Unable to (self)assign '{}' and seek to earliest offsets",
+            topic
+        )))?;
+
+        // Prepare desired assignment, setting offset to earliest available for each partition
+        let mut desired_assignment = TopicPartitionList::with_capacity(topic_meta.partitions().len());
+        for partition_meta in topic_meta.partitions().iter() {
+            let (earliest, _) = consumer.fetch_watermarks(topic, partition_meta.id(), Duration::from_millis(500))?;
+            desired_assignment.add_partition_offset(topic, partition_meta.id(), Offset::Offset(earliest))?;
+        }
+
+        // Finally, self-assign
+        consumer.assign(&desired_assignment)?;
+
+        Ok(())
+    }
 }
+
+struct KonsumerOffsetsDataContext;
+
+impl ClientContext for KonsumerOffsetsDataContext {}
+
+impl ConsumerContext for KonsumerOffsetsDataContext {
+    fn post_rebalance(&self, rebalance: &Rebalance) {
+        match rebalance {
+            Rebalance::Assign(tpl) => {
+                trace!("Assigned '{}' partitions of {}", tpl.count(), KONSUMER_OFFSETS_DATA_TOPIC);
+            },
+            Rebalance::Revoke(tpl) => {
+                trace!("Revoked {} partitions of {}", tpl.count(), KONSUMER_OFFSETS_DATA_TOPIC);
+            },
+            Rebalance::Error(e) => {
+                error!("Rebalance Failed: {}", e);
+            },
+        }
+    }
+
+    fn commit_callback(&self, _: KafkaResult<()>, offsets: &TopicPartitionList) {
+        for assigned_tp in offsets.elements().into_iter() {
+            match assigned_tp.offset() {
+                Offset::Invalid => {
+                    // No-Op
+                },
+                _ => {
+                    trace!(
+                        "Committed '{}:{}' at {:?}",
+                        assigned_tp.topic(),
+                        assigned_tp.partition(),
+                        assigned_tp.offset()
+                    )
+                },
+            }
+        }
+    }
+}
+
+type KonsumerOffsetsDataConsumer = StreamConsumer<KonsumerOffsetsDataContext>;
 
 #[async_trait]
 impl Emitter for KonsumerOffsetsDataEmitter {
@@ -58,16 +131,22 @@ impl Emitter for KonsumerOffsetsDataEmitter {
     /// * `shutdown_token`: A [`CancellationToken`] that, when cancelled, will make the internal loop terminate.
     ///
     fn spawn(&self, shutdown_token: CancellationToken) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
-        let consumer_client: StreamConsumer = Self::set_kafka_config(self.consumer_client_config.clone())
-            .create()
-            .expect("Failed to create Consumer Client");
+        let consumer_context = KonsumerOffsetsDataContext;
+
+        let consumer_client: KonsumerOffsetsDataConsumer =
+            Self::set_kafka_consumer_config(self.consumer_client_config.clone())
+                .create_with_context(consumer_context)
+                .expect("Failed to create Consumer Client");
 
         let (sx, rx) = mpsc::channel::<KonsumerOffsetsData>(CHANNEL_SIZE);
 
         let join_handle = tokio::spawn(async move {
-            match subscribe_and_seek_to_beginning(&consumer_client, KONSUMER_OFFSETS_DATA_TOPIC).await {
-                Ok(_) => info!("Subscribed to {KONSUMER_OFFSETS_DATA_TOPIC} and sought to beginning"),
-                Err(e) => panic!("Failed to subscribe and seek to beginning '{KONSUMER_OFFSETS_DATA_TOPIC}': {e}"),
+            match Self::assign_and_seek_to_earliest_all_partitions(&consumer_client, KONSUMER_OFFSETS_DATA_TOPIC).await
+            {
+                Ok(_) => info!(
+                    "(Self) Assigned all partitions of {KONSUMER_OFFSETS_DATA_TOPIC} and sought offsets to ealiest"
+                ),
+                Err(e) => panic!("Failed to (self) assign '{KONSUMER_OFFSETS_DATA_TOPIC}': {e}"),
             }
 
             loop {
@@ -82,7 +161,7 @@ impl Emitter for KonsumerOffsetsDataEmitter {
                                         }
                                     }
                                     Err(e) => {
-                                        error!("Failed to consume from __consumer_offsets: {e}");
+                                        error!("Failed to consume from {}: {e}", KONSUMER_OFFSETS_DATA_TOPIC);
                                     }
                                 }
                             },
@@ -101,22 +180,4 @@ impl Emitter for KonsumerOffsetsDataEmitter {
 
         (rx, join_handle)
     }
-}
-
-async fn subscribe_and_seek_to_beginning(consumer: &StreamConsumer, topic: &str) -> KafkaResult<()> {
-    // Subscribe to topic: note, the actual subscription is finalized only later
-    consumer.subscribe(&[topic])?;
-
-    // Wait for messages to start coming in.
-    // Once the first message is received, subscription has happened
-    let _ = consumer.recv().await?;
-
-    // Fetch the current position of all the subscribed partitions
-    let mut subscriptions = consumer.position()?;
-
-    // Seek back to the beginning all the subscribed partitions
-    subscriptions.set_all_offsets(Offset::Beginning)?;
-    consumer.seek_partitions(subscriptions, Duration::from_secs(5))?;
-
-    Ok(())
 }
