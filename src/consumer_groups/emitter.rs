@@ -34,7 +34,7 @@ impl From<GroupList> for ConsumerGroups {
         };
 
         for g in gl.groups() {
-            // Ignore own consumer of `__consumer_offsets` topic.
+            // Ignore own consumer of `__consumer_offsets` topic
             if g.name() == KONSUMER_OFFSETS_KCL_CONSUMER {
                 continue;
             }

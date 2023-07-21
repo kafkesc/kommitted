@@ -7,6 +7,7 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
+use crate::constants::KONSUMER_OFFSETS_DATA_TOPIC;
 use crate::internals::Emitter;
 use crate::kafka_types::{Broker, TopicPartitionsStatus};
 
@@ -39,7 +40,13 @@ impl ClusterStatus {
     fn from(id: Option<String>, m: Metadata) -> Self {
         Self {
             id: id.unwrap_or_else(|| CLUSTER_ID_NONE.to_string()),
-            topics: m.topics().iter().map(TopicPartitionsStatus::from).collect(),
+            topics: m
+                .topics()
+                .iter()
+                // Ignore `__consumer_offsets` topic
+                .filter(|mt| mt.name() != KONSUMER_OFFSETS_DATA_TOPIC)
+                .map(TopicPartitionsStatus::from)
+                .collect(),
             brokers: m.brokers().iter().map(Broker::from).collect(),
         }
     }
