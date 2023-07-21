@@ -137,7 +137,7 @@ fn kv_clap_value_parser(kv: &str) -> Result<KVPair, String> {
 /// To be used as [`clap::value_parser`] function to create a [`SocketAddr`].
 fn socketaddr_value_parser(socket_addr: &str) -> Result<SocketAddr, String> {
     let socket_addr_normalized = if socket_addr.is_empty() || socket_addr == ":" {
-        format!("{DEFAULT_HTTP_HOST_PORT}")
+        DEFAULT_HTTP_HOST_PORT.to_string()
     } else if socket_addr.starts_with(':') {
         format!("{DEFAULT_HTTP_HOST}{socket_addr}")
     } else if socket_addr.ends_with(':') {
