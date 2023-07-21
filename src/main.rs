@@ -56,7 +56,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let lag_reg_arc = Arc::new(lag_reg);
 
     // Init `http` module
-    let http_fut = http::init(cs_reg_arc.clone(), po_reg_arc.clone(), lag_reg_arc.clone(), shutdown_token.clone());
+    let http_fut =
+        http::init(cli.listen_on, cs_reg_arc.clone(), po_reg_arc.clone(), lag_reg_arc.clone(), shutdown_token.clone());
 
     // Join all the async tasks, then let it terminate
     let _ = tokio::join!(cs_join, po_join, kod_join, cg_join, http_fut);

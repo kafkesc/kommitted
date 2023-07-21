@@ -1,5 +1,8 @@
 use clap::{ArgGroup, Parser};
 use rdkafka::ClientConfig;
+use std::net::{SocketAddr, ToSocketAddrs};
+
+use crate::constants::{DEFAULT_HTTP_HOST, DEFAULT_HTTP_HOST_PORT, DEFAULT_HTTP_PORT};
 
 /// Command Line Interface, defined via the declarative,
 /// `derive` based functionality of the `clap` crate.
@@ -22,7 +25,7 @@ pub struct Cli {
     /// Client identifier used by the internal Kafka (Admin) Client.
     ///
     /// Equivalent to '--config=client.id:my-client-id'.
-    #[arg(long = "client-id", value_name = "CLIENT_ID", default_value = env ! ("CARGO_PKG_NAME"))]
+    #[arg(long = "client-id", value_name = "CLIENT_ID", default_value = env!("CARGO_PKG_NAME"))]
     pub client_id: String,
 
     /// Additional configuration used by the internal Kafka (Admin) Client (format: 'CONF_KEY:CONF_VAL').
@@ -54,6 +57,23 @@ pub struct Cli {
     /// a "moving window" of offsets history.
     #[arg(long = "history", value_name = "SIZE", default_value = "3600", verbatim_doc_comment)]
     pub offsets_history: usize,
+
+    /// Address to listen on (i.e. bind to), to receive HTTP requests.
+    ///
+    /// In addition to the canonical 'HOST:PORT' format, it also allows for:
+    ///
+    /// * ':PORT' / 'PORT' (assumes default 'HOST')
+    /// * 'HOST:' / 'HOST' (assumes default 'PORT')
+    /// * ':'              (fallback on default)
+    #[arg(
+        short,
+        long = "listen-on",
+        value_name = "HOST:PORT",
+        value_parser = socketaddr_value_parser,
+        default_value = DEFAULT_HTTP_HOST_PORT,
+        verbatim_doc_comment
+    )]
+    pub listen_on: SocketAddr,
 
     /// Verbose logging.
     ///
@@ -112,4 +132,26 @@ fn kv_clap_value_parser(kv: &str) -> Result<KVPair, String> {
     };
 
     Ok((k.to_string(), v.to_string()))
+}
+
+/// To be used as [`clap::value_parser`] function to create a [`SocketAddr`].
+fn socketaddr_value_parser(socket_addr: &str) -> Result<SocketAddr, String> {
+    let socket_addr_normalized = if socket_addr.is_empty() || socket_addr == ":" {
+        format!("{DEFAULT_HTTP_HOST_PORT}")
+    } else if socket_addr.starts_with(':') {
+        format!("{DEFAULT_HTTP_HOST}{socket_addr}")
+    } else if socket_addr.ends_with(':') {
+        format!("{socket_addr}{DEFAULT_HTTP_PORT}")
+    } else if socket_addr.parse::<u16>().is_ok() {
+        format!("{DEFAULT_HTTP_HOST}:{socket_addr}")
+    } else if socket_addr.contains(':') {
+        socket_addr.to_string()
+    } else {
+        format!("{socket_addr}:{DEFAULT_HTTP_PORT}")
+    };
+
+    match socket_addr_normalized.to_socket_addrs() {
+        Ok(mut iter) => iter.next().ok_or(format!("Unable to parse address '{socket_addr}'")),
+        Err(e) => Err(format!("Failed to parse address '{socket_addr}': {e}")),
+    }
 }

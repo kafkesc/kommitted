@@ -13,9 +13,9 @@ use tokio_util::sync::CancellationToken;
 
 use crate::cluster_status::ClusterStatusRegister;
 use crate::lag_register::LagRegister;
-
 use crate::partition_offsets::PartitionOffsetsRegister;
-use metrics::*;
+
+use self::metrics::*;
 
 // TODO HTTP Endpoints
 //   /                Landing page
@@ -35,6 +35,7 @@ struct HttpServiceState {
 }
 
 pub async fn init(
+    socket_addr: SocketAddr,
     cs_reg: Arc<ClusterStatusRegister>,
     po_reg: Arc<PartitionOffsetsRegister>,
     lag_reg: Arc<LagRegister>,
@@ -53,16 +54,12 @@ pub async fn init(
         .route("/metrics", get(prometheus_metrics))
         .with_state(state);
 
-    // run our app with hyper
-    // `axum::Server` is a re-export of `hyper::Server`
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    debug!("listening on {}", addr);
-
-    axum::Server::bind(&addr)
+    let server = axum::Server::bind(&socket_addr)
         .serve(app.into_make_service())
-        .with_graceful_shutdown(shutdown_token.cancelled())
-        .await
-        .expect("HTTP Graceful Shutdown handler returned an error - this should never happen")
+        .with_graceful_shutdown(shutdown_token.cancelled());
+
+    info!("Begin listening on '{}'...", socket_addr);
+    server.await.expect("HTTP Graceful Shutdown handler returned an error - this should never happen");
 }
 
 async fn root() -> &'static str {
