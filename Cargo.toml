@@ -17,10 +17,10 @@ exclude = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-trait = "0.1.71"
-axum = { version = "0.6.18", features = ["http2"] }
+async-trait = "0.1.72"
+axum = { version = "0.6.19", features = ["http2"] }
 chrono = "0.4.26"
-clap = { version = "4.3.12", features = ["derive", "deprecated", "env", "wrap_help"] }
+clap = { version = "4.3.17", features = ["derive", "deprecated", "env", "wrap_help"] }
 const_format = "0.2.31"
 ctrlc = { version = "3.4.0", features = ["termination"] }
 env_logger = "0.10.0"
@@ -29,7 +29,7 @@ hyper = { version = "0.14.27", features = ["http1", "http2", "server", "runtime"
 konsumer_offsets = { version = "0.3.0", default-features = false, features = ["ts_chrono"] }
 log = "0.4.19"
 regex = "1.9.1"
-thiserror = "1.0.43"
+thiserror = "1.0.44"
 tokio = { version = "1.29.1", features = ["rt", "rt-multi-thread", "time", "sync", "macros"] }
 tokio-util = "0.7.8"
 
