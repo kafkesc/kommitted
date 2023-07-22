@@ -18,12 +18,15 @@ use crate::partition_offsets::PartitionOffsetsRegister;
 use self::metrics::*;
 
 // TODO HTTP Endpoints
-//   /                Landing page
-//   /metrics         Prometheus Metrics, filterable via `collect[]` or `name[]` array query param of metrics filter by
-//   /status/healthy  Service healthy
-//   /status/ready    Service ready (metrics are ready to be scraped)
-//   /groups
-//   /cluster
+//   GET /            - Landing page
+//   GET /metrics     - List Prometheus Metrics
+//   GET /brokers     - Cluster meta and list of Brokers
+//   GET /topics      - List of Topics
+//   GET /topics/{t}  - List of Partitions for Topic t
+//   GET /groups      - List of Consumer Groups
+//   GET /groups/{g}  - List of Members for Consumer group g
+//   GET /status/healthy - Service healthy
+//   GET /status/ready   - Service (metrics) ready
 //
 // TODO Add a layer of compression for GZip (optional for Prometheus)
 

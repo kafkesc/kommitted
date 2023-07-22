@@ -2,13 +2,164 @@
 
 <div align="center" style="text-align: center;">
 
-Care about your Customers, measure your Kafka Consumer Lag
+Measure Kafka Consumer _Offset_ and _Time_ Lags
 
 </div>
 
-## [WIP] Architecture Diagram
+KCL is a solution to measure the _Lag_ (i.e. _Latency_) of Kafka consumers.
+It works with all consumers that _commit_ their offsets into Kafka the
+[standard way](https://kafka.apache.org/documentation/#design_consumerposition), as it
+consumes the internal `__consumer_offsets` topic (using the
+[konsumer_offsets](https://crates.io/crates/konsumer_offsets) crate).
 
-![](https://docs.google.com/drawings/d/e/2PACX-1vTJf5vkITRpDPlL-icLwYHRbUB7Y2KGbkkdcKNhECJ3tdrUJud9Cr3Hnowp_nLN55aiZuw01hmzXNmw/pub?w=1008&h=761)
+Metrics are exported at the `/metrics` endpoint, based on the
+[Prometheus](https://prometheus.io/)
+[Exposition formats](https://prometheus.io/docs/instrumenting/exposition_formats/#exposition-formats).
+
+Please go to the [design docs](./DESIGN.md) if interested in the internals.
+
+## Features
+
+WIP
+
+## Getting started
+
+WIP installation
+
+### In Docker
+
+WIP
+
+## Usage
+
+Thanks to [clap](https://crates.io/crates/clap), KCL provides out of the box support for _compact_ and
+_extended_ usage instructions.
+
+### Compact: `kcl -h`
+
+```shell
+Usage: kcl [OPTIONS] --brokers <BOOTSTRAP_BROKERS>
+
+Options:
+  -b, --brokers <BOOTSTRAP_BROKERS>     Initial Kafka Brokers to connect to (format: 'HOST:PORT,...')
+      --client-id <CLIENT_ID>           Client identifier used by the internal Kafka (Admin) Client [default: kcl]
+      --kafka-conf <CONF_KEY:CONF_VAL>  Additional configuration used by the internal Kafka (Admin) Client (format: 'CONF_KEY:CONF_VAL').
+      --cluster-id <CLUSTER_ID>         Override identifier of the monitored Kafka Cluster
+      --history <SIZE>                  For each Topic Partition, how much history of offsets to track in memory. [default: 3600]
+  -l, --listen-on <HOST:PORT>           Address to listen on (i.e. bind to), to receive HTTP requests. [default: localhost:9090]
+  -v, --verbose...                      Verbose logging.
+  -q, --quiet...                        Quiet logging.
+  -h, --help                            Print help (see more with '--help')
+  -V, --version                         Print version
+```
+
+### Extended: `kcl --help`
+
+```shell
+Usage: kcl [OPTIONS] --brokers <BOOTSTRAP_BROKERS>
+
+Options:
+  -b, --brokers <BOOTSTRAP_BROKERS>
+          Initial Kafka Brokers to connect to (format: 'HOST:PORT,...').
+
+          Equivalent to '--config=bootstrap.servers:host:port,...'.
+
+      --client-id <CLIENT_ID>
+          Client identifier used by the internal Kafka (Admin) Client.
+
+          Equivalent to '--config=client.id:my-client-id'.
+
+          [default: kcl]
+
+      --kafka-conf <CONF_KEY:CONF_VAL>
+          Additional configuration used by the internal Kafka (Admin) Client (format: 'CONF_KEY:CONF_VAL').
+
+          To set multiple configurations keys, use this argument multiple times.
+          See: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md.
+
+      --cluster-id <CLUSTER_ID>
+          Override identifier of the monitored Kafka Cluster.
+
+          If set, it replaces the value `cluster.id` from the Brokers' configuration. This can be useful when `cluster.id` is not actually set.
+
+      --history <SIZE>
+          For each Topic Partition, how much history of offsets to track in memory.
+
+          Offsets data points are collected every 500ms, on average: so, on average,
+          30 minutes of data points is 3600 offsets, assuming partition offsets are
+          regularly produced to.
+
+          Once this limit is reached, the oldest data points are discarded, realising
+          a "moving window" of offsets history.
+
+          [default: 3600]
+
+  -l, --listen-on <HOST:PORT>
+          Address to listen on (i.e. bind to), to receive HTTP requests.
+
+          In addition to the canonical 'HOST:PORT' format, it also allows for:
+
+          * ':PORT' / 'PORT' (assumes default 'HOST')
+          * 'HOST:' / 'HOST' (assumes default 'PORT')
+          * ':'              (fallback on default)
+
+          [default: localhost:9090]
+
+  -v, --verbose...
+          Verbose logging.
+
+          * none    = 'WARN'
+          * '-v'    = 'INFO'
+          * '-vv'   = 'DEBUG'
+          * '-vvv'  = 'TRACE'
+
+          Alternatively, set environment variable 'KCL_LOG=(ERROR|WARN|INFO|DEBUG|TRACE|OFF)'.
+
+  -q, --quiet...
+          Quiet logging.
+
+          * none    = 'WARN'
+          * '-q'    = 'ERROR'
+          * '-qq'   = 'OFF'
+
+          Alternatively, set environment variable 'KCL_LOG=(ERROR|WARN|INFO|DEBUG|TRACE|OFF)'.
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+```
+
+### Connect to Kafka cluster requiring [`SASL_SSL`](https://en.wikipedia.org/wiki/Simple_Authentication_and_Security_Layer)
+
+```shell
+$ kcl \
+    --brokers {{ BOOTSTRAP_BROKERS or BROKER_ENDPOINT }} \
+    --config security.protocol:SASL_SSL \
+    --config sasl.mechanisms=PLAIN \
+    --config sasl.username:{{ USERNAME or API_KEY }} \
+    --config sasl.password:{{ PASSWORD or API_SECRET }} \  
+    ...
+```
+
+### Log verbosity
+
+Ksunami follows the long tradition of `-v/-q` to control the verbosity of it's logging:
+
+| Arguments | Log verbosity level | Default |
+|----------:|:--------------------|:-------:|
+|  `-qq...` | `OFF`               |         |
+|      `-q` | `ERROR`             |         |
+|    _none_ | `WARN`              |    x    |
+|      `-v` | `INFO`              |         |
+|     `-vv` | `DEBUG`             |         |
+| `-vvv...` | `TRACE`             |         |
+
+It uses [log](https://crates.io/crates/log) and [env_logger](https://crates.io/crates/env_logger),
+and so logging can be configured and fine-tuned using the Environment Variable `KCL_LOG`.
+Please take a look at [env_logger doc](https://docs.rs/env_logger/latest/env_logger/#enabling-logging) for
+more details.
 
 ## License
 
