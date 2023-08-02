@@ -3,6 +3,7 @@ use std::{
     sync::Arc,
 };
 
+use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use konsumer_offsets::{GroupMetadata, KonsumerOffsetsData, OffsetCommit};
 use log::Level::Trace;
@@ -10,6 +11,7 @@ use tokio::sync::{mpsc, RwLock};
 
 use crate::constants::KONSUMER_OFFSETS_KCL_CONSUMER;
 use crate::consumer_groups::ConsumerGroups;
+use crate::internals::Awaitable;
 use crate::kafka_types::{Group, Member, TopicPartition};
 use crate::partition_offsets::PartitionOffsetsRegister;
 
@@ -305,5 +307,16 @@ async fn process_group_metadata(gm: GroupMetadata, lag_register_groups: Arc<RwLo
         None => {
             warn!("Received {} about unknown Group '{}': ignoring", std::any::type_name::<GroupMetadata>(), gm.group);
         },
+    }
+}
+
+#[async_trait]
+impl Awaitable for LagRegister {
+    async fn is_ready(&self) -> bool {
+        // TODO this is pretty "weak" as readyness-check.
+        //   Something better would be to check that the registry has reached as "stable" number
+        //   of groups with a stable number of registered lags against it.
+        //   But that requires tracking changes over multiple checks: it can wait.
+        self.lag_by_group.read().await.len() > 0
     }
 }

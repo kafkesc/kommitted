@@ -18,31 +18,28 @@ use std::{error::Error, sync::Arc};
 use tokio_util::sync::CancellationToken;
 
 use crate::cli::Cli;
-use crate::partition_offsets::PartitionOffsetsRegister;
+use crate::internals::Awaitable;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = parse_cli_and_init_logging();
     let admin_client_config = cli.build_client_config();
-
     let shutdown_token = build_shutdown_token();
 
-    // Init `cluster_status` module
+    // Init `cluster_status` module, and await registry to be ready
     let (cs_reg, cs_join) = cluster_status::init(admin_client_config.clone(), cli.cluster_id, shutdown_token.clone());
+    cs_reg.await_ready(shutdown_token.clone()).await?;
     let cs_reg_arc = Arc::new(cs_reg);
 
-    // Init `partition_offsets` module
+    // Init `partition_offsets` module, and await registry to be ready
     let (po_reg, po_join) = partition_offsets::init(
         admin_client_config.clone(),
         cli.offsets_history,
+        0.1,
         cs_reg_arc.clone(),
         shutdown_token.clone(),
     );
-    // Await for the Partition Offset register to be ready
-    if !po_reg.await_ready(0.1, shutdown_token.clone()).await {
-        warn!("Terminated before {} was ready", std::any::type_name::<PartitionOffsetsRegister>());
-        std::process::exit(exit_code::SERVICE_UNAVAILABLE);
-    }
+    po_reg.await_ready(shutdown_token.clone()).await?;
     let po_reg_arc = Arc::new(po_reg);
 
     // Init `konsumer_offsets_data` module
@@ -51,8 +48,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Init `consumer_groups` module
     let (cg_rx, cg_join) = consumer_groups::init(admin_client_config.clone(), shutdown_token.clone());
 
-    // Init `lag_register` module
+    // Init `lag_register` module, and await registry to be ready
     let lag_reg = lag_register::init(cg_rx, kod_rx, po_reg_arc.clone());
+    lag_reg.await_ready(shutdown_token.clone()).await?;
     let lag_reg_arc = Arc::new(lag_reg);
 
     // Init `http` module

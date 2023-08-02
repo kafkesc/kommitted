@@ -1,27 +1,23 @@
 use std::{collections::HashMap, sync::Arc};
 
+use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
-use tokio::{
-    sync::{mpsc::Receiver, RwLock},
-    time::interval,
-    time::Duration as TokioDuration,
-};
-use tokio_util::sync::CancellationToken;
+use tokio::sync::{mpsc::Receiver, RwLock};
 
 use super::emitter::PartitionOffset;
 use super::errors::{PartitionOffsetsError, PartitionOffsetsResult};
 use super::lag_estimator::PartitionLagEstimator;
 
+use crate::internals::Awaitable;
 use crate::kafka_types::TopicPartition;
 use crate::partition_offsets::tracked_offset::TrackedOffset;
-
-const READYNESS_CHECK_INTERVAL: TokioDuration = TokioDuration::from_secs(2);
 
 /// Holds the offset of all Topic Partitions in the Kafka Cluster, and can estimate lag of Consumers.
 ///
 /// This is where a tracked Consumer Group, at a tracked offset in time, can get it's lag estimated.
 pub struct PartitionOffsetsRegister {
     estimators: Arc<RwLock<HashMap<TopicPartition, RwLock<PartitionLagEstimator>>>>,
+    ready_at: f64,
 }
 
 impl PartitionOffsetsRegister {
@@ -34,9 +30,12 @@ impl PartitionOffsetsRegister {
     ///   History for each (`Topic, Partition`) pair is kept in a queue-like structure of this
     ///   size. Each entry in the structure is the pair (`Offset, UTC TS`): each pair represents
     ///   at what moment in time that particular offset was valid.
-    pub fn new(mut rx: Receiver<PartitionOffset>, offsets_history: usize) -> Self {
+    /// * `ready_at` - Percentage at which [`Self`] can be considered ready.
+    ///   NOTE: [`Self`] is an [`Awaitable`].
+    pub fn new(mut rx: Receiver<PartitionOffset>, offsets_history: usize, ready_at: f64) -> Self {
         let por = Self {
             estimators: Arc::new(RwLock::new(HashMap::new())),
+            ready_at,
         };
 
         // A clone of the `por.estimator` will be moved into the async task
@@ -254,42 +253,13 @@ impl PartitionOffsetsRegister {
 
         (min, max, sum / count as f64, count)
     }
+}
 
-    /// Waits for when [`Self`] is ready, or has been terminated.
-    ///
-    /// Returns `false` if this is terminated before reaching the [`Self::is_ready`] state.
-    ///
-    /// # Arguments
-    ///
-    /// * `readyness_percent` - The percentage of ready-ness we want for [`Self`]
-    ///   to be considered "ready".
-    /// * `shutdown_token` - If this [`CancellationToken`] gets cancelled,
-    ///   this will stop waiting and return.
-    pub async fn await_ready(&self, readyness_percent: f64, shutdown_token: CancellationToken) -> bool {
-        let mut interval = interval(READYNESS_CHECK_INTERVAL);
-        loop {
-            tokio::select! {
-                _ = interval.tick() => {
-                    if self.is_ready(readyness_percent).await {
-                        return true;
-                    }
-                },
-                _ = shutdown_token.cancelled() => {
-                    info!("Received shutdown signal");
-                    return false;
-                },
-            }
-        }
-    }
-
-    /// Returns `true` if [`Self`] is ready, `false` otherwise.
-    ///
-    /// # Arguments
-    ///
-    /// * `readyness_percent` - The percentage of readyness we want for [`Self`] to be considered "ready".
-    pub async fn is_ready(&self, readyness_percent: f64) -> bool {
+#[async_trait]
+impl Awaitable for PartitionOffsetsRegister {
+    async fn is_ready(&self) -> bool {
         let (min, max, avg, count) = self.get_usage().await;
-        let is_ready = avg > readyness_percent;
+        let is_ready = avg > self.ready_at;
 
         info!(
             "{} usage stats:

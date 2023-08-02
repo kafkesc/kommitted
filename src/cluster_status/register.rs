@@ -1,8 +1,11 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use tokio::sync::{mpsc::Receiver, RwLock};
 
 use super::emitter::ClusterStatus;
+
+use crate::internals::Awaitable;
 use crate::kafka_types::{Broker, TopicPartition};
 
 /// Registers and exposes the latest [`ClusterStatus`].
@@ -114,5 +117,13 @@ impl ClusterStatusRegister {
             None => Vec::new(),
             Some(cs) => cs.brokers.clone(),
         }
+    }
+}
+
+#[async_trait]
+impl Awaitable for ClusterStatusRegister {
+    /// [`Self`] ready when its internal copy of [`ClusterStatus`] has been populated.
+    async fn is_ready(&self) -> bool {
+        self.latest_status.read().await.is_some()
     }
 }
