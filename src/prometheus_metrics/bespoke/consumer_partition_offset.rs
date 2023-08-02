@@ -3,18 +3,22 @@ use const_format::formatcp;
 use crate::kafka_types::Member;
 use crate::lag_register::Lag;
 
+use super::super::{
+    LABEL_CLUSTER_ID, LABEL_GROUP, LABEL_MEMBER_CLIENT_ID, LABEL_MEMBER_HOST, LABEL_MEMBER_ID, LABEL_PARTITION,
+    LABEL_TOPIC, NAMESPACE,
+};
 use super::{normalize_owner_data, HEADER_HELP, HEADER_TYPE, TYPE_GAUGE};
 
-const NAME: &str = "kcl_kafka_consumer_partition_offset";
+const NAME: &str = formatcp!("{NAMESPACE}_kafka_consumer_partition_offset");
 const HELP: &str = formatcp!("{HEADER_HELP} {NAME} The last consumed offset by the consumer of the topic partition. NOTE: '0, -1' means 'unknown'.");
 const TYPE: &str = formatcp!("{HEADER_TYPE} {NAME} {TYPE_GAUGE}");
 
-pub(in super::super) fn append_headers(res: &mut Vec<String>) {
+pub(crate) fn append_headers(res: &mut Vec<String>) {
     res.push(HELP.into());
     res.push(TYPE.into());
 }
 
-pub(in super::super) fn append_metric(
+pub(crate) fn append_metric(
     cluster_id: &str,
     group: &str,
     topic: &str,
@@ -34,13 +38,13 @@ pub(in super::super) fn append_metric(
     res.push(format!(
         "{NAME}\
         {{\
-            cluster_id=\"{cluster_id}\",\
-            group=\"{group}\",\
-            topic=\"{topic}\",\
-            partition=\"{partition}\",\
-            member_id=\"{member_id}\",\
-            member_host=\"{member_host}\",\
-            member_client_id=\"{member_client_id}\"\
+            {LABEL_CLUSTER_ID}=\"{cluster_id}\",\
+            {LABEL_GROUP}=\"{group}\",\
+            {LABEL_TOPIC}=\"{topic}\",\
+            {LABEL_PARTITION}=\"{partition}\",\
+            {LABEL_MEMBER_ID}=\"{member_id}\",\
+            {LABEL_MEMBER_HOST}=\"{member_host}\",\
+            {LABEL_MEMBER_CLIENT_ID}=\"{member_client_id}\"\
         }} \
         {offset} \
         {offset_timestamp_utc_ms}"

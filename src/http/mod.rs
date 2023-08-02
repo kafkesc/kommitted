@@ -1,5 +1,3 @@
-mod metrics;
-
 use std::{net::SocketAddr, sync::Arc};
 
 use axum::{
@@ -14,8 +12,7 @@ use tokio_util::sync::CancellationToken;
 use crate::cluster_status::ClusterStatusRegister;
 use crate::lag_register::LagRegister;
 use crate::partition_offsets::PartitionOffsetsRegister;
-
-use self::metrics::*;
+use crate::prometheus_metrics::bespoke::*;
 
 // TODO HTTP Endpoints
 //   GET /            - Landing page

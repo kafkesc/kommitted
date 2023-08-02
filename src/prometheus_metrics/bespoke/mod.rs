@@ -9,7 +9,7 @@ pub mod partition_latest_tracked_offset;
 use crate::kafka_types::Member;
 use crate::lag_register::{Lag, LagRegister};
 
-pub(self) const UNKNOWN_VAL: &str = "UNKNOWN";
+use super::UNKNOWN_VAL;
 
 #[allow(unused)]
 pub(self) const TYPE_COUNTER: &str = "counter";
