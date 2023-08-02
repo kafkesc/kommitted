@@ -12,6 +12,7 @@ mod konsumer_offsets_data;
 mod lag_register;
 mod logging;
 mod partition_offsets;
+mod prometheus_metrics;
 
 use std::{error::Error, sync::Arc};
 
@@ -53,9 +54,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
     lag_reg.await_ready(shutdown_token.clone()).await?;
     let lag_reg_arc = Arc::new(lag_reg);
 
+    // Init `prometheus_metrics` module
+    let prom_reg = prometheus_metrics::init(cs_reg_arc.get_cluster_id().await);
+
     // Init `http` module
-    let http_fut =
-        http::init(cli.listen_on, cs_reg_arc.clone(), po_reg_arc.clone(), lag_reg_arc.clone(), shutdown_token.clone());
+    let http_fut = http::init(
+        cli.listen_on,
+        cs_reg_arc.clone(),
+        po_reg_arc.clone(),
+        lag_reg_arc.clone(),
+        shutdown_token.clone(),
+        Arc::new(prom_reg),
+    );
 
     // Join all the async tasks, then let it terminate
     let _ = tokio::join!(cs_join, po_join, kod_join, cg_join, http_fut);

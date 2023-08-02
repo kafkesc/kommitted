@@ -7,6 +7,7 @@ use axum::{
     routing::get,
     Router,
 };
+use prometheus::{Registry, TextEncoder};
 use tokio_util::sync::CancellationToken;
 
 use crate::cluster_status::ClusterStatusRegister;
@@ -32,6 +33,7 @@ struct HttpServiceState {
     cs_reg: Arc<ClusterStatusRegister>,
     po_reg: Arc<PartitionOffsetsRegister>,
     lag_reg: Arc<LagRegister>,
+    metrics: Arc<Registry>,
 }
 
 pub async fn init(
@@ -40,11 +42,13 @@ pub async fn init(
     po_reg: Arc<PartitionOffsetsRegister>,
     lag_reg: Arc<LagRegister>,
     shutdown_token: CancellationToken,
+    metrics: Arc<Registry>,
 ) {
     let state = HttpServiceState {
         cs_reg,
         po_reg,
         lag_reg,
+        metrics,
     };
 
     // build our application with a route
@@ -67,7 +71,7 @@ async fn root() -> &'static str {
 }
 
 async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoResponse {
-    let status = StatusCode::OK;
+    let mut status = StatusCode::OK;
     let mut headers = HeaderMap::new();
 
     // Procure the Cluster ID once and reuse it in all metrics that get generated
@@ -214,5 +218,15 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
     //   HELP: Time taken to fetch earliest/latest (watermark) offsets of all the topic partitions of the cluster.
     //   LABELS: cluster_id?
 
-    (status, headers, body.join("\n"))
+    // Turn the bespoke metrics created so far, into a String
+    let mut body = body.join("\n");
+
+    // Append the the bespoke metrics, internal (normal?) Prometheus Metrics
+    let metrics_family = state.metrics.gather();
+    if let Err(e) = TextEncoder.encode_utf8(&metrics_family, &mut body) {
+        status = StatusCode::INTERNAL_SERVER_ERROR;
+        body = format!("Failed to encode metrics: {e}");
+    }
+
+    (status, headers, body)
 }
