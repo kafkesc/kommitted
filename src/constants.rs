@@ -15,4 +15,5 @@ pub(crate) const DEFAULT_HTTP_HOST: &str = "localhost";
 pub(crate) const DEFAULT_HTTP_PORT: &str = "9090";
 
 /// The default host:port to bind to when launching internal HTTP server.
-pub(crate) const DEFAULT_HTTP_HOST_PORT: &str = formatcp!("{DEFAULT_HTTP_HOST}:{DEFAULT_HTTP_PORT}");
+pub(crate) const DEFAULT_HTTP_HOST_PORT: &str =
+    formatcp!("{DEFAULT_HTTP_HOST}:{DEFAULT_HTTP_PORT}");

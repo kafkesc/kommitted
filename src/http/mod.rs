@@ -63,7 +63,9 @@ pub async fn init(
         .with_graceful_shutdown(shutdown_token.cancelled());
 
     info!("Begin listening on '{}'...", socket_addr);
-    server.await.expect("HTTP Graceful Shutdown handler returned an error - this should never happen");
+    server
+        .await
+        .expect("HTTP Graceful Shutdown handler returned an error - this should never happen");
 }
 
 async fn root() -> &'static str {
@@ -88,8 +90,14 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
     //
     // The capacity is necessarily a function of the number of metric types produced,
     // and the number of topic partitions.
-    let tp_count: usize =
-        state.lag_reg.lag_by_group.read().await.iter().map(|(_, gwl)| gwl.lag_by_topic_partition.len()).sum();
+    let tp_count: usize = state
+        .lag_reg
+        .lag_by_group
+        .read()
+        .await
+        .iter()
+        .map(|(_, gwl)| gwl.lag_by_topic_partition.len())
+        .sum();
     let metric_types_count: usize = 3;
     let headers_footers_count: usize = metric_types_count * 2;
     let metrics_count: usize = tp_count * metric_types_count;
@@ -97,17 +105,30 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
 
     // ----------------------------------------------------------- METRIC: consumer_partition_offset
     consumer_partition_offset::append_headers(&mut body);
-    iter_lag_reg(&state.lag_reg, &mut body, &cluster_id, consumer_partition_offset::append_metric).await;
+    iter_lag_reg(&state.lag_reg, &mut body, &cluster_id, consumer_partition_offset::append_metric)
+        .await;
     body.push(String::new());
 
     // ------------------------------------------------------- METRIC: consumer_partition_lag_offset
     consumer_partition_lag_offset::append_headers(&mut body);
-    iter_lag_reg(&state.lag_reg, &mut body, &cluster_id, consumer_partition_lag_offset::append_metric).await;
+    iter_lag_reg(
+        &state.lag_reg,
+        &mut body,
+        &cluster_id,
+        consumer_partition_lag_offset::append_metric,
+    )
+    .await;
     body.push(String::new());
 
     // ------------------------------------------------- METRIC: consumer_partition_lag_milliseconds
     consumer_partition_lag_milliseconds::append_headers(&mut body);
-    iter_lag_reg(&state.lag_reg, &mut body, &cluster_id, consumer_partition_lag_milliseconds::append_metric).await;
+    iter_lag_reg(
+        &state.lag_reg,
+        &mut body,
+        &cluster_id,
+        consumer_partition_lag_milliseconds::append_metric,
+    )
+    .await;
     body.push(String::new());
 
     // ------------------------------------------------- METRIC: partition_earliest_available_offset
@@ -135,7 +156,13 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
     for tp in tps.iter() {
         match state.po_reg.get_latest_available_offset(tp).await {
             Ok(lao) => {
-                partition_latest_available_offset::append_metric(&cluster_id, &tp.topic, tp.partition, lao, &mut body);
+                partition_latest_available_offset::append_metric(
+                    &cluster_id,
+                    &tp.topic,
+                    tp.partition,
+                    lao,
+                    &mut body,
+                );
             },
             Err(e) => {
                 warn!("Unable to generate 'partition_latest_available_offset': {e}");

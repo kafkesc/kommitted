@@ -109,7 +109,9 @@ impl Cli {
 
     pub fn build_client_config(&self) -> ClientConfig {
         let mut config = ClientConfig::new();
-        config.set("bootstrap.servers", self.bootstrap_brokers.clone()).set("client.id", self.client_id.clone());
+        config
+            .set("bootstrap.servers", self.bootstrap_brokers.clone())
+            .set("client.id", self.client_id.clone());
         for cfg in &self.kafka_config {
             config.set(cfg.0.clone(), cfg.1.clone());
         }

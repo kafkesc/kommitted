@@ -73,7 +73,10 @@ impl Emitter for PartitionOffsetsEmitter {
     ///
     /// * `shutdown_token`: A [`CancellationToken`] that, when cancelled, will make the internal loop terminate.
     ///
-    fn spawn(&self, shutdown_token: CancellationToken) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
+    fn spawn(
+        &self,
+        shutdown_token: CancellationToken,
+    ) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
         let admin_client: AdminClient<DefaultClientContext> =
             self.client_config.create().expect("Failed to allocate Admin Client");
 
@@ -88,7 +91,11 @@ impl Emitter for PartitionOffsetsEmitter {
                     trace!("Fetching earliest/latest offset for Partitions of Topic '{}'", t);
 
                     for p in csr.get_partitions_for_topic(t.as_str()).await.unwrap_or_default() {
-                        match admin_client.inner().fetch_watermarks(t.as_str(), p as i32, FETCH_TIMEOUT) {
+                        match admin_client.inner().fetch_watermarks(
+                            t.as_str(),
+                            p as i32,
+                            FETCH_TIMEOUT,
+                        ) {
                             Ok((earliest, latest)) => {
                                 let po = PartitionOffset {
                                     topic: t.clone(),
@@ -111,7 +118,9 @@ impl Emitter for PartitionOffsetsEmitter {
                                 }
                             },
                             Err(e) => {
-                                error!("Failed to fetch partition '{t}:{p}' begin/end offsets: {e}");
+                                error!(
+                                    "Failed to fetch partition '{t}:{p}' begin/end offsets: {e}"
+                                );
                             },
                         }
                     }

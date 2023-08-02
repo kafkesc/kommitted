@@ -12,7 +12,10 @@ use tokio_util::sync::CancellationToken;
 pub trait Emitter {
     type Emitted: Send;
 
-    fn spawn(&self, shutdown_token: CancellationToken) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>);
+    fn spawn(
+        &self,
+        shutdown_token: CancellationToken,
+    ) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>);
 
     /// Emit the `Self::Emitted`, but first wait for the next `interval` tick.
     ///
@@ -45,7 +48,10 @@ pub trait Emitter {
     ) -> Result<(), mpsc::error::SendError<Self::Emitted>> {
         // Warn in case channel is saturated
         if sender.capacity() == 0 {
-            warn!("Channel to emit {} saturated: receiver too slow?", std::any::type_name::<Self::Emitted>());
+            warn!(
+                "Channel to emit {} saturated: receiver too slow?",
+                std::any::type_name::<Self::Emitted>()
+            );
         }
 
         // Send the object

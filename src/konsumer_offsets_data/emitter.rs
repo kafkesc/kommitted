@@ -63,10 +63,19 @@ impl KonsumerOffsetsDataEmitter {
         )))?;
 
         // Prepare desired assignment, setting offset to earliest available for each partition
-        let mut desired_assignment = TopicPartitionList::with_capacity(topic_meta.partitions().len());
+        let mut desired_assignment =
+            TopicPartitionList::with_capacity(topic_meta.partitions().len());
         for partition_meta in topic_meta.partitions().iter() {
-            let (earliest, _) = consumer.fetch_watermarks(topic, partition_meta.id(), Duration::from_millis(500))?;
-            desired_assignment.add_partition_offset(topic, partition_meta.id(), Offset::Offset(earliest))?;
+            let (earliest, _) = consumer.fetch_watermarks(
+                topic,
+                partition_meta.id(),
+                Duration::from_millis(500),
+            )?;
+            desired_assignment.add_partition_offset(
+                topic,
+                partition_meta.id(),
+                Offset::Offset(earliest),
+            )?;
         }
 
         // Finally, self-assign
@@ -130,7 +139,10 @@ impl Emitter for KonsumerOffsetsDataEmitter {
     ///
     /// * `shutdown_token`: A [`CancellationToken`] that, when cancelled, will make the internal loop terminate.
     ///
-    fn spawn(&self, shutdown_token: CancellationToken) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
+    fn spawn(
+        &self,
+        shutdown_token: CancellationToken,
+    ) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
         let consumer_context = KonsumerOffsetsDataContext;
 
         let consumer_client: KonsumerOffsetsDataConsumer =

@@ -124,7 +124,10 @@ impl Emitter for ConsumerGroupsEmitter {
     ///
     /// * `shutdown_token`: A [`CancellationToken`] that, when cancelled, will make the internal loop terminate.
     ///
-    fn spawn(&self, shutdown_token: CancellationToken) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
+    fn spawn(
+        &self,
+        shutdown_token: CancellationToken,
+    ) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
         let admin_client: AdminClient<DefaultClientContext> =
             self.admin_client_config.create().expect("Failed to allocate Admin Client");
 
@@ -134,7 +137,10 @@ impl Emitter for ConsumerGroupsEmitter {
             let mut interval = interval(FETCH_INTERVAL);
 
             loop {
-                let res_groups = admin_client.inner().fetch_group_list(None, FETCH_TIMEOUT).map(Self::Emitted::from);
+                let res_groups = admin_client
+                    .inner()
+                    .fetch_group_list(None, FETCH_TIMEOUT)
+                    .map(Self::Emitted::from);
 
                 match res_groups {
                     Ok(groups) => {

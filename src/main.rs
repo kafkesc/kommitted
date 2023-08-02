@@ -28,7 +28,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let shutdown_token = build_shutdown_token();
 
     // Init `cluster_status` module, and await registry to be ready
-    let (cs_reg, cs_join) = cluster_status::init(admin_client_config.clone(), cli.cluster_id, shutdown_token.clone());
+    let (cs_reg, cs_join) =
+        cluster_status::init(admin_client_config.clone(), cli.cluster_id, shutdown_token.clone());
     cs_reg.await_ready(shutdown_token.clone()).await?;
     let cs_reg_arc = Arc::new(cs_reg);
 
@@ -44,10 +45,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let po_reg_arc = Arc::new(po_reg);
 
     // Init `konsumer_offsets_data` module
-    let (kod_rx, kod_join) = konsumer_offsets_data::init(admin_client_config.clone(), shutdown_token.clone());
+    let (kod_rx, kod_join) =
+        konsumer_offsets_data::init(admin_client_config.clone(), shutdown_token.clone());
 
     // Init `consumer_groups` module
-    let (cg_rx, cg_join) = consumer_groups::init(admin_client_config.clone(), shutdown_token.clone());
+    let (cg_rx, cg_join) =
+        consumer_groups::init(admin_client_config.clone(), shutdown_token.clone());
 
     // Init `lag_register` module, and await registry to be ready
     let lag_reg = lag_register::init(cg_rx, kod_rx, po_reg_arc.clone());

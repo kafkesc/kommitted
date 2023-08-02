@@ -89,7 +89,10 @@ impl Emitter for ClusterStatusEmitter {
     ///
     /// * `shutdown_token`: A [`CancellationToken`] that, when cancelled, will make the internal loop terminate.
     ///
-    fn spawn(&self, shutdown_token: CancellationToken) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
+    fn spawn(
+        &self,
+        shutdown_token: CancellationToken,
+    ) -> (mpsc::Receiver<Self::Emitted>, JoinHandle<()>) {
         let admin_client: AdminClient<DefaultClientContext> =
             self.admin_client_config.create().expect("Failed to allocate Admin Client");
 
@@ -99,11 +102,9 @@ impl Emitter for ClusterStatusEmitter {
             let mut interval = interval(FETCH_INTERVAL);
 
             loop {
-                match admin_client
-                    .inner()
-                    .fetch_metadata(None, FETCH_TIMEOUT)
-                    .map(|m| Self::Emitted::from(admin_client.inner().fetch_cluster_id(FETCH_TIMEOUT), m))
-                {
+                match admin_client.inner().fetch_metadata(None, FETCH_TIMEOUT).map(|m| {
+                    Self::Emitted::from(admin_client.inner().fetch_cluster_id(FETCH_TIMEOUT), m)
+                }) {
                     Ok(status) => {
                         tokio::select! {
                             res = Self::emit_with_interval(&sx, status, &mut interval) => {

@@ -110,7 +110,10 @@ impl LagRegister {
                             name,
                             gwl.lag_by_topic_partition.len(),
                             gwl.lag_by_topic_partition.iter().filter(|x| x.1.lag.is_some()).count(),
-                            gwl.lag_by_topic_partition.iter().filter(|x| x.1.owner.is_some()).count(),
+                            gwl.lag_by_topic_partition
+                                .iter()
+                                .filter(|x| x.1.owner.is_some())
+                                .count(),
                         );
                     }
                 }
@@ -121,7 +124,10 @@ impl LagRegister {
     }
 }
 
-async fn process_consumer_groups(cg: ConsumerGroups, lag_register_groups: Arc<RwLock<HashMap<String, GroupWithLag>>>) {
+async fn process_consumer_groups(
+    cg: ConsumerGroups,
+    lag_register_groups: Arc<RwLock<HashMap<String, GroupWithLag>>>,
+) {
     for (group_name, group_with_members) in cg.groups.into_iter() {
         // Ignore own consumer of `__consumer_offsets` topic.
         if group_name == KONSUMER_OFFSETS_KCL_CONSUMER {
@@ -179,12 +185,13 @@ async fn process_consumer_groups(cg: ConsumerGroups, lag_register_groups: Arc<Rw
             // either update the owner Member of an existing one,
             // or create a new entry with no Lag set.
             for (tp, m) in members_by_topic_partition.into_iter() {
-                gwl.lag_by_topic_partition.entry(tp).and_modify(|lwo| lwo.owner = Some(m.clone())).or_insert_with(
-                    || LagWithOwner {
+                gwl.lag_by_topic_partition
+                    .entry(tp)
+                    .and_modify(|lwo| lwo.owner = Some(m.clone()))
+                    .or_insert_with(|| LagWithOwner {
                         owner: Some(m),
                         ..Default::default()
-                    },
-                );
+                    });
             }
         };
     }
@@ -220,7 +227,10 @@ async fn process_offset_commit(
                         0
                     },
                 },
-                time_lag: match po_reg.estimate_time_lag(&tp, oc.offset as u64, oc.commit_timestamp).await {
+                time_lag: match po_reg
+                    .estimate_time_lag(&tp, oc.offset as u64, oc.commit_timestamp)
+                    .await
+                {
                     Ok(tl) => tl,
                     Err(e) => {
                         error!(
@@ -235,20 +245,28 @@ async fn process_offset_commit(
             // Create or update entry `TopicPartition -> LagWithOwner`:
             // either update the Lag of an existing one,
             // or create a new entry with no owner set.
-            gwl.lag_by_topic_partition.entry(tp).and_modify(|lwo| lwo.lag = Some(l.clone())).or_insert_with(|| {
-                LagWithOwner {
+            gwl.lag_by_topic_partition
+                .entry(tp)
+                .and_modify(|lwo| lwo.lag = Some(l.clone()))
+                .or_insert_with(|| LagWithOwner {
                     lag: Some(l),
                     owner: None,
-                }
-            });
+                });
         },
         None => {
-            warn!("Received {} about unknown Group '{}': ignoring", std::any::type_name::<OffsetCommit>(), oc.group);
+            warn!(
+                "Received {} about unknown Group '{}': ignoring",
+                std::any::type_name::<OffsetCommit>(),
+                oc.group
+            );
         },
     }
 }
 
-async fn process_group_metadata(gm: GroupMetadata, lag_register_groups: Arc<RwLock<HashMap<String, GroupWithLag>>>) {
+async fn process_group_metadata(
+    gm: GroupMetadata,
+    lag_register_groups: Arc<RwLock<HashMap<String, GroupWithLag>>>,
+) {
     // Ignore own consumer of `__consumer_offsets` topic.
     if gm.group == KONSUMER_OFFSETS_KCL_CONSUMER {
         return;
@@ -287,7 +305,10 @@ async fn process_group_metadata(gm: GroupMetadata, lag_register_groups: Arc<RwLo
                         .map(|tp| (tp, owner.clone()))
                         .collect::<HashMap<TopicPartition, Member>>();
 
-                    assignment_tps.into_iter().chain(subscription_tps).collect::<HashMap<TopicPartition, Member>>()
+                    assignment_tps
+                        .into_iter()
+                        .chain(subscription_tps)
+                        .collect::<HashMap<TopicPartition, Member>>()
                 })
                 .collect::<HashMap<TopicPartition, Member>>();
 
@@ -305,7 +326,11 @@ async fn process_group_metadata(gm: GroupMetadata, lag_register_groups: Arc<RwLo
             }
         },
         None => {
-            warn!("Received {} about unknown Group '{}': ignoring", std::any::type_name::<GroupMetadata>(), gm.group);
+            warn!(
+                "Received {} about unknown Group '{}': ignoring",
+                std::any::type_name::<GroupMetadata>(),
+                gm.group
+            );
         },
     }
 }

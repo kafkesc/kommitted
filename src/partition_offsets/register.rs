@@ -192,7 +192,10 @@ impl PartitionOffsetsRegister {
     /// Get the earliest available offset of specific [`TopicPartition`].
     ///
     /// This is the earliest offset still available in the Kafka Cluster.
-    pub async fn get_earliest_available_offset(&self, topic_partition: &TopicPartition) -> PartitionOffsetsResult<u64> {
+    pub async fn get_earliest_available_offset(
+        &self,
+        topic_partition: &TopicPartition,
+    ) -> PartitionOffsetsResult<u64> {
         self.estimators
             .read()
             .await
@@ -209,7 +212,10 @@ impl PartitionOffsetsRegister {
     /// Get the latest available offset of specific [`TopicPartition`].
     ///
     /// This is the latest offset still available in the Kafka Cluster.
-    pub async fn get_latest_available_offset(&self, topic_partition: &TopicPartition) -> PartitionOffsetsResult<u64> {
+    pub async fn get_latest_available_offset(
+        &self,
+        topic_partition: &TopicPartition,
+    ) -> PartitionOffsetsResult<u64> {
         self.estimators
             .read()
             .await

@@ -99,7 +99,9 @@ impl PartitionLagEstimator {
                     new_latest_tracked, curr_latest.offset
                 );
                 return;
-            } else if curr_latest.offset < new_latest_tracked && curr_latest.at > new_latest_tracked_datetime {
+            } else if curr_latest.offset < new_latest_tracked
+                && curr_latest.at > new_latest_tracked_datetime
+            {
                 // Very unlikely scenario: ignore update if offset date-time precedes latest tracked
                 warn!(
                     "Update with offset {} of date-time '{}' that precedes current latest {} of '{}': ignoring",
@@ -161,7 +163,11 @@ impl PartitionLagEstimator {
     ///
     /// * `offset` - Given offset we want to compare against the latest tracked offset
     /// * `offset_datetime` - The [`DateTime<Utc>`] this offset was committed
-    pub fn estimate_time_lag(&self, offset: u64, offset_datetime: DateTime<Utc>) -> PartitionOffsetsResult<Duration> {
+    pub fn estimate_time_lag(
+        &self,
+        offset: u64,
+        offset_datetime: DateTime<Utc>,
+    ) -> PartitionOffsetsResult<Duration> {
         // It's rare, but if we happen to receive a consumed offset that is ahead of the last
         // tracked end offset, we can just return a Duration of `0` for time lag.
         let lto = self.latest_tracked_offset()?.offset;
@@ -190,10 +196,12 @@ impl PartitionLagEstimator {
                 let second_latest_tracked = self.nth_latest_tracked_offset(2)?;
 
                 // Estimate production time, considering widest range possible: earliest and latest tracked
-                let widest_estimate = interpolate_offset_to_datetime(earliest_tracked, latest_tracked, offset)?;
+                let widest_estimate =
+                    interpolate_offset_to_datetime(earliest_tracked, latest_tracked, offset)?;
 
                 // Estimate production time, considering narrowest range possible: 2nd-latest and latest tracked
-                let narrowest_estimate = interpolate_offset_to_datetime(second_latest_tracked, latest_tracked, offset)?;
+                let narrowest_estimate =
+                    interpolate_offset_to_datetime(second_latest_tracked, latest_tracked, offset)?;
 
                 // Return the average of the 2 estimates
                 if widest_estimate < narrowest_estimate {
@@ -230,7 +238,8 @@ impl PartitionLagEstimator {
     ///
     /// This is useful to assess how "full" is the `PartitionLagEstimator`.
     pub fn usage_percent(&self) -> f64 {
-        self.latest_tracked_offsets.len() as f64 / self.latest_tracked_offsets.capacity() as f64 * 100_f64
+        self.latest_tracked_offsets.len() as f64 / self.latest_tracked_offsets.capacity() as f64
+            * 100_f64
     }
 
     /// Get the earliest offset available in the cluster
@@ -314,7 +323,9 @@ fn utc_from_ms(utc_timestamp_ms: i64) -> PartitionOffsetsResult<DateTime<Utc>> {
 
 #[cfg(test)]
 mod test {
-    use crate::partition_offsets::lag_estimator::{interpolate_offset_to_datetime, utc_from_ms, PartitionLagEstimator};
+    use crate::partition_offsets::lag_estimator::{
+        interpolate_offset_to_datetime, utc_from_ms, PartitionLagEstimator,
+    };
     use crate::partition_offsets::tracked_offset::TrackedOffset;
     use chrono::Duration;
 
@@ -440,9 +451,18 @@ mod test {
 
         // Estimate on and inside the first 2: the lag is predictable,
         // by looking at the data we just entered above for offset `5` and `10`
-        assert_eq!(estimator.estimate_time_lag(5, utc_from_ms(11).unwrap()), Ok(Duration::nanoseconds(1000000)));
-        assert_eq!(estimator.estimate_time_lag(7, utc_from_ms(16).unwrap()), Ok(Duration::nanoseconds(2000000)));
-        assert_eq!(estimator.estimate_time_lag(10, utc_from_ms(23).unwrap()), Ok(Duration::nanoseconds(3000000)));
+        assert_eq!(
+            estimator.estimate_time_lag(5, utc_from_ms(11).unwrap()),
+            Ok(Duration::nanoseconds(1000000))
+        );
+        assert_eq!(
+            estimator.estimate_time_lag(7, utc_from_ms(16).unwrap()),
+            Ok(Duration::nanoseconds(2000000))
+        );
+        assert_eq!(
+            estimator.estimate_time_lag(10, utc_from_ms(23).unwrap()),
+            Ok(Duration::nanoseconds(3000000))
+        );
 
         // Add 2 more: this should push the first 2 (offsets `5` and `10` off the internal queue)
         estimator.update(2, 39, utc_from_ms(73).unwrap());
@@ -451,9 +471,18 @@ mod test {
         // Estimation increases for the same point we evaluated above:
         // this happens because the remaining points lead to a interpolation that moves the estimated
         // line for discarded points, a bit back on the x-axis of time.
-        assert_eq!(estimator.estimate_time_lag(5, utc_from_ms(11).unwrap()), Ok(Duration::nanoseconds(6000000)));
-        assert_eq!(estimator.estimate_time_lag(7, utc_from_ms(16).unwrap()), Ok(Duration::nanoseconds(7000000)));
-        assert_eq!(estimator.estimate_time_lag(10, utc_from_ms(23).unwrap()), Ok(Duration::nanoseconds(7000000)));
+        assert_eq!(
+            estimator.estimate_time_lag(5, utc_from_ms(11).unwrap()),
+            Ok(Duration::nanoseconds(6000000))
+        );
+        assert_eq!(
+            estimator.estimate_time_lag(7, utc_from_ms(16).unwrap()),
+            Ok(Duration::nanoseconds(7000000))
+        );
+        assert_eq!(
+            estimator.estimate_time_lag(10, utc_from_ms(23).unwrap()),
+            Ok(Duration::nanoseconds(7000000))
+        );
     }
 
     #[test]

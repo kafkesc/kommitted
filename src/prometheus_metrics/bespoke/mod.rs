@@ -45,7 +45,15 @@ pub async fn iter_lag_reg(
 ) {
     for (g, gwl) in lag_reg.lag_by_group.read().await.iter() {
         for (tp, lwo) in gwl.lag_by_topic_partition.iter() {
-            ilrf(cluster_id, g, tp.topic.as_ref(), tp.partition, lwo.owner.as_ref(), lwo.lag.as_ref(), metrics_vec);
+            ilrf(
+                cluster_id,
+                g,
+                tp.topic.as_ref(),
+                tp.partition,
+                lwo.owner.as_ref(),
+                lwo.lag.as_ref(),
+                metrics_vec,
+            );
         }
     }
 }

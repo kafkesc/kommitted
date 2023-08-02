@@ -29,7 +29,8 @@ pub fn init(
     shutdown_token: CancellationToken,
 ) -> (PartitionOffsetsRegister, JoinHandle<()>) {
     let (po_rx, poe_join) =
-        PartitionOffsetsEmitter::new(admin_client_config, cluster_status_register).spawn(shutdown_token);
+        PartitionOffsetsEmitter::new(admin_client_config, cluster_status_register)
+            .spawn(shutdown_token);
     let po_reg = PartitionOffsetsRegister::new(po_rx, register_offsets_history, ready_at);
 
     debug!("Initialized");

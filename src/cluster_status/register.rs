@@ -88,7 +88,11 @@ impl ClusterStatusRegister {
     pub async fn get_partitions_for_topic(&self, topic: &str) -> Option<Vec<u32>> {
         match &*(self.latest_status.read().await) {
             None => None,
-            Some(cs) => cs.topics.iter().find(|t| t.name == topic).map(|t| t.partitions.iter().map(|p| p.id).collect()),
+            Some(cs) => cs
+                .topics
+                .iter()
+                .find(|t| t.name == topic)
+                .map(|t| t.partitions.iter().map(|p| p.id).collect()),
         }
     }
 
