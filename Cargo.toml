@@ -17,7 +17,7 @@ exclude = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-trait = "0.1.72"
+async-trait = "0.1.73"
 axum = { version = "0.6.20", features = ["http2"] }
 chrono = "0.4.26"
 clap = { version = "4.3.21", features = ["derive", "deprecated", "env", "wrap_help"] }
