@@ -1,0 +1,39 @@
+name: Creates.io Publish
+
+on:
+  push:
+    tags: [ "v[0-9]+.[0-9]+.[0-9]+*" ]
+
+  # TODO Remove once we have done a couple of releases and confirmed this is solid
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish:
+    name: Publish
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y libsasl2-dev
+
+      - name: Check-out
+        uses: actions/checkout@v3
+
+      - name: Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Cargo publish
+        run: cargo publish --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_PUBLISH_TOKEN }}
