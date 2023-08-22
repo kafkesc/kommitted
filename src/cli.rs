@@ -82,7 +82,7 @@ pub struct Cli {
     /// * '-vv'   = 'DEBUG'
     /// * '-vvv'  = 'TRACE'
     ///
-    /// Alternatively, set environment variable 'KCL_LOG=(ERROR|WARN|INFO|DEBUG|TRACE|OFF)'.
+    /// Alternatively, set environment variable 'KOMMITTED_LOG=(ERROR|WARN|INFO|DEBUG|TRACE|OFF)'.
     #[arg(short, long, action = clap::ArgAction::Count, verbatim_doc_comment)]
     pub verbose: u8,
 
@@ -92,7 +92,7 @@ pub struct Cli {
     /// * '-q'    = 'ERROR'
     /// * '-qq'   = 'OFF'
     ///
-    /// Alternatively, set environment variable 'KCL_LOG=(ERROR|WARN|INFO|DEBUG|TRACE|OFF)'.
+    /// Alternatively, set environment variable 'KOMMITTED_LOG=(ERROR|WARN|INFO|DEBUG|TRACE|OFF)'.
     #[arg(short, long, action = clap::ArgAction::Count, verbatim_doc_comment)]
     pub quiet: u8,
 }

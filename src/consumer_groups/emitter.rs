@@ -10,7 +10,7 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::constants::KONSUMER_OFFSETS_KCL_CONSUMER;
+use crate::constants::KOMMITTED_CONSUMER_OFFSETS_CONSUMER;
 use crate::internals::Emitter;
 use crate::kafka_types::{Group, GroupWithMembers, Member, MemberWithAssignment, TopicPartition};
 
@@ -35,7 +35,7 @@ impl From<GroupList> for ConsumerGroups {
 
         for g in gl.groups() {
             // Ignore own consumer of `__consumer_offsets` topic
-            if g.name() == KONSUMER_OFFSETS_KCL_CONSUMER {
+            if g.name() == KOMMITTED_CONSUMER_OFFSETS_CONSUMER {
                 continue;
             }
 

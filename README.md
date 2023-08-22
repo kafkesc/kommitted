@@ -1,4 +1,4 @@
-# KCL - Kafka Consumer Lag
+# Kommitted - Measure Kafka consumers lag
 
 <div align="center" style="text-align: center;">
 
@@ -6,13 +6,12 @@ Measure Kafka Consumer **Offset Lag** _and_ **Time Lag**
 
 </div>
 
-**KCL** is a service to measure the _Lag_ (i.e. _Latency_) of Kafka consumers.
-It works with all consumers that _commit_ their offsets into Kafka the
-[standard way](https://kafka.apache.org/documentation/#design_consumerposition), as it
+**Kommitted** is a service to measure the _Lag_ (i.e. _Latency_) of Kafka consumers.
+It works with all consumers that _commit_ their offsets into Kafka (i.e. the
+[standard way](https://kafka.apache.org/documentation/#design_consumerposition)), as it
 consumes the internal `__consumer_offsets` topic.
 
-Metrics are exported (at the `/metrics` endpoint, following the
-[Prometheus](https://prometheus.io/)
+Metrics are exported following the [Prometheus](https://prometheus.io/)
 [Exposition formats](https://prometheus.io/docs/instrumenting/exposition_formats/#exposition-formats).
 
 Please see [DESIGN.md](./DESIGN.md) for details about the overall architecture, dependencies and other details.
@@ -25,8 +24,8 @@ Please see [DESIGN.md](./DESIGN.md) for details about the overall architecture, 
 * [x] Offset and Lag metrics are tracked with all contextual information to identify exact topic partition assignments
 * [ ] Exposes additional metrics to track status of Kafka cluster (topics, members, brokers, partitions)
 * [ ] Exposes Kafka-polling metrics, to assess its own performance
-* [x] Metrics exposed in [Prometheus format](https://prometheus.io/docs/instrumenting/exposition_formats/#exposition-formats)
-* [ ] REST API to build further automation on top of it (eg. auto-scaling logics that depend on Consumer Group lag)
+* [x] Metrics exposed in [Prometheus format](https://prometheus.io/docs/instrumenting/exposition_formats/#exposition-formats), at `/metrics` endpoint
+* [ ] REST API to build further automation on top of it (e.g. auto-scaling logics that depend on Consumer Group lag)
 
 All of this comes based on:
 
@@ -45,18 +44,19 @@ WIP
 
 ## Usage
 
-KCL supports _compact_ (`-h`) and _extended_ (`--help`) usage instructions. Use the former for a quick look up;
-the latter to better understand what each argument can do.
+Kommitted supports _compact_ (`-h`) and _extended_ (`--help`) usage instructions.
+Use the former for a quick look up; use the latter to better understand what
+each argument can do.
 
 <details open>
-  <summary>Compact: `kcl -h`</summary>
+  <summary>Compact: `kommitted -h`</summary>
 
   ```shell
-    Usage: kcl [OPTIONS] --brokers <BOOTSTRAP_BROKERS>
+    Usage: kommitted [OPTIONS] --brokers <BOOTSTRAP_BROKERS>
     
     Options:
     -b, --brokers <BOOTSTRAP_BROKERS>     Initial Kafka Brokers to connect to (format: 'HOST:PORT,...')
-    --client-id <CLIENT_ID>           Client identifier used by the internal Kafka (Admin) Client [default: kcl]
+    --client-id <CLIENT_ID>           Client identifier used by the internal Kafka (Admin) Client [default: kommitted]
     --kafka-conf <CONF_KEY:CONF_VAL>  Additional configuration used by the internal Kafka (Admin) Client (format: 'CONF_KEY:CONF_VAL').
     --cluster-id <CLUSTER_ID>         Override identifier of the monitored Kafka Cluster
     --history <SIZE>                  For each Topic Partition, how much history of offsets to track in memory. [default: 3600]
@@ -69,10 +69,10 @@ the latter to better understand what each argument can do.
 </details>
   
 <details>
-  <summary>Extended: `kcl --help`</summary>
+  <summary>Extended: `kommitted --help`</summary>
   
   ```shell
-  Usage: kcl [OPTIONS] --brokers <BOOTSTRAP_BROKERS>
+  Usage: kommitted [OPTIONS] --brokers <BOOTSTRAP_BROKERS>
   
   Options:
     -b, --brokers <BOOTSTRAP_BROKERS>
@@ -85,7 +85,7 @@ the latter to better understand what each argument can do.
   
             Equivalent to '--config=client.id:my-client-id'.
   
-            [default: kcl]
+            [default: kommitted]
   
         --kafka-conf <CONF_KEY:CONF_VAL>
             Additional configuration used by the internal Kafka (Admin) Client (format: 'CONF_KEY:CONF_VAL').
@@ -129,7 +129,7 @@ the latter to better understand what each argument can do.
             * '-vv'   = 'DEBUG'
             * '-vvv'  = 'TRACE'
   
-            Alternatively, set environment variable 'KCL_LOG=(ERROR|WARN|INFO|DEBUG|TRACE|OFF)'.
+            Alternatively, set environment variable 'KOMMITTED_LOG=(ERROR|WARN|INFO|DEBUG|TRACE|OFF)'.
   
     -q, --quiet...
             Quiet logging.
@@ -138,7 +138,7 @@ the latter to better understand what each argument can do.
             * '-q'    = 'ERROR'
             * '-qq'   = 'OFF'
   
-            Alternatively, set environment variable 'KCL_LOG=(ERROR|WARN|INFO|DEBUG|TRACE|OFF)'.
+            Alternatively, set environment variable 'KOMMITTED_LOG=(ERROR|WARN|INFO|DEBUG|TRACE|OFF)'.
   
     -h, --help
             Print help (see a summary with '-h')
@@ -151,7 +151,7 @@ the latter to better understand what each argument can do.
 ### Connect to Kafka cluster requiring [`SASL_SSL`](https://en.wikipedia.org/wiki/Simple_Authentication_and_Security_Layer)
 
 ```shell
-$ kcl \
+$ kommitted \
     --brokers {{ BOOTSTRAP_BROKERS or BROKER_ENDPOINT }} \
     --config security.protocol:SASL_SSL \
     --config sasl.mechanisms=PLAIN \
@@ -174,7 +174,7 @@ Ksunami follows the long tradition of `-v/-q` to control the verbosity of it's l
 | `-vvv...` | `TRACE`             |         |
 
 It uses [log](https://crates.io/crates/log) and [env_logger](https://crates.io/crates/env_logger),
-and so logging can be configured and fine-tuned using the Environment Variable `KCL_LOG`.
+and so logging can be configured and fine-tuned using the Environment Variable `KOMMITTED_LOG`.
 Please take a look at [env_logger doc](https://docs.rs/env_logger/latest/env_logger/#enabling-logging)
 for more details.
 

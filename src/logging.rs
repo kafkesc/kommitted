@@ -1,8 +1,8 @@
-pub const LOG_FILTER_ENV_VAR: &str = "KCL_LOG";
+pub const LOG_FILTER_ENV_VAR: &str = "KOMMITTED_LOG";
 
 /// Log level will be configured based on the given `verbosity_level`.
 ///
-/// If the env var `KCL_LOG` is set, that will take precedence and configuration
+/// If the env var `KOMMITTED_LOG` is set, that will take precedence and configuration
 /// will be based on the rules described [here](https://docs.rs/env_logger/latest/env_logger/#enabling-logging).
 pub fn init(verbosity_level: i8) {
     let default_log_level = match verbosity_level {

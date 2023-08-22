@@ -9,7 +9,7 @@ use konsumer_offsets::{GroupMetadata, KonsumerOffsetsData, OffsetCommit};
 use log::Level::Trace;
 use tokio::sync::{mpsc, RwLock};
 
-use crate::constants::KONSUMER_OFFSETS_KCL_CONSUMER;
+use crate::constants::KOMMITTED_CONSUMER_OFFSETS_CONSUMER;
 use crate::consumer_groups::ConsumerGroups;
 use crate::internals::Awaitable;
 use crate::kafka_types::{Group, Member, TopicPartition};
@@ -130,7 +130,7 @@ async fn process_consumer_groups(
 ) {
     for (group_name, group_with_members) in cg.groups.into_iter() {
         // Ignore own consumer of `__consumer_offsets` topic.
-        if group_name == KONSUMER_OFFSETS_KCL_CONSUMER {
+        if group_name == KOMMITTED_CONSUMER_OFFSETS_CONSUMER {
             continue;
         }
 
@@ -203,7 +203,7 @@ async fn process_offset_commit(
     po_reg: Arc<PartitionOffsetsRegister>,
 ) {
     // Ignore own consumer of `__consumer_offsets` topic.
-    if oc.group == KONSUMER_OFFSETS_KCL_CONSUMER {
+    if oc.group == KOMMITTED_CONSUMER_OFFSETS_CONSUMER {
         return;
     }
 
@@ -268,7 +268,7 @@ async fn process_group_metadata(
     lag_register_groups: Arc<RwLock<HashMap<String, GroupWithLag>>>,
 ) {
     // Ignore own consumer of `__consumer_offsets` topic.
-    if gm.group == KONSUMER_OFFSETS_KCL_CONSUMER {
+    if gm.group == KOMMITTED_CONSUMER_OFFSETS_CONSUMER {
         return;
     }
 

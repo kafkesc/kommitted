@@ -1,5 +1,5 @@
 [package]
-name = "kcl"
+name = "kommitted"
 version = "0.1.0"
 edition = "2021"
 authors = [
@@ -7,8 +7,8 @@ authors = [
     "Ivan De Marino <ivan.de.marino@gmail.com>",
     "Kafkesc <https://github.com/kafkesc>",
 ]
-repository = "https://github.com/kafkesc/kcl"
-homepage = "https://github.com/kafkesc/kcl"
+repository = "https://github.com/kafkesc/kommitted"
+homepage = "https://github.com/kafkesc/kommitted"
 description = "Measure Kafka Consumer Offset Lag and Time Lag"
 license = "MIT OR Apache-2.0"
 keywords = ["kafka", "consume", "lag", "monitoring", "performance"]

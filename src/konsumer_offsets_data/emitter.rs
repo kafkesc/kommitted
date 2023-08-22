@@ -10,7 +10,7 @@ use rdkafka::{
 use tokio::{sync::mpsc, task::JoinHandle, time::Duration};
 use tokio_util::sync::CancellationToken;
 
-use crate::constants::{KONSUMER_OFFSETS_DATA_TOPIC, KONSUMER_OFFSETS_KCL_CONSUMER};
+use crate::constants::{KOMMITTED_CONSUMER_OFFSETS_CONSUMER, KONSUMER_OFFSETS_DATA_TOPIC};
 use crate::internals::Emitter;
 
 const CHANNEL_SIZE: usize = 2000;
@@ -43,7 +43,7 @@ impl KonsumerOffsetsDataEmitter {
         client_config.set("enable.partition.eof", "false");
 
         if client_config.get("group.id").is_none() {
-            client_config.set("group.id", KONSUMER_OFFSETS_KCL_CONSUMER);
+            client_config.set("group.id", KOMMITTED_CONSUMER_OFFSETS_CONSUMER);
         }
 
         client_config.set_log_level(RDKafkaLogLevel::Warning);

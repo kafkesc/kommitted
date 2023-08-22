@@ -216,32 +216,32 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
     //
     // --- CLUSTER METRICS ---
     //
-    // TODO `kcl_consumer_groups_total`
+    // TODO `kommitted_consumer_groups_total`
     //   LABELS: cluster_id?
     //
-    // TODO `kcl_consumer_group_members_total`
+    // TODO `kommitted_consumer_group_members_total`
     //   LABELS: cluster_id?
     //
-    // TODO `kcl_cluster_status_brokers_total`
+    // TODO `kommitted_cluster_status_brokers_total`
     //   LABELS: cluster_id?
     //
-    // TODO `kcl_cluster_status_topics_total`
+    // TODO `kommitted_cluster_status_topics_total`
     //   LABELS: cluster_id?
     //
-    // TODO `kcl_cluster_status_partitions_total`
+    // TODO `kommitted_cluster_status_partitions_total`
     //   LABELS: cluster_id?
     //
-    // --- KCL INTERNAL METRICS ---
+    // --- KOMMITTED INTERNAL METRICS ---
     //
-    // TODO `kcl_consumer_groups_poll_time_seconds`
+    // TODO `kommitted_consumer_groups_poll_time_seconds`
     //   HELP: Time taken to fetch information about all consumer groups in the cluster.
     //   LABELS: cluster_id?
     //
-    // TODO `kcl_cluster_status_poll_time_ms`
+    // TODO `kommitted_cluster_status_poll_time_ms`
     //   HELP: Time taken to fetch information about the composition of the cluster (brokers, topics, partitions).
     //   LABELS: cluster_id?
     //
-    // TODO `kcl_partitions_watermark_offsets_poll_time_ms`
+    // TODO `kommitted_partitions_watermark_offsets_poll_time_ms`
     //   HELP: Time taken to fetch earliest/latest (watermark) offsets of all the topic partitions of the cluster.
     //   LABELS: cluster_id?
 

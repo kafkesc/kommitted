@@ -1,11 +1,11 @@
-# Metrics exposed by KCL
+# Metrics exposed by Kommitted
 
 ## Metrics
 
 ### Consumer Metrics
 
 <dl>
-  <dt><code>kcl_kafka_consumer_partition_lag_milliseconds</code></dt>
+  <dt><code>kommitted_kafka_consumer_partition_lag_milliseconds</code></dt>
   <dd>
     <b>Description:</b> <i>The time difference (time lag) between when the latest offset was produced and the latest consumed offset was consumed, by the consumer of the topic partition, expressed in milliseconds. NOTE: '-1, -1' means 'unknown'.</i><br/>
     <b>Labels:</b> <code>cluster_id, group, topic, partition, member_id, member_host, member_client_id</code><br/>
@@ -15,7 +15,7 @@
 </dl>
 
 <dl>
-  <dt><code>kcl_kafka_consumer_partition_lag_offset</code></dt>
+  <dt><code>kommitted_kafka_consumer_partition_lag_offset</code></dt>
   <dd>
     <b>Description:</b> <i>The difference (lag) between the last produced offset and the last consumed offset, by the consumer of the topic partition. NOTE: '0, -1' means 'unknown'.</i><br/>
     <b>Labels:</b> <code>cluster_id, group, topic, partition, member_id, member_host, member_client_id</code><br/>
@@ -25,7 +25,7 @@
 </dl>
 
 <dl>
-  <dt><code>kcl_kafka_consumer_partition_offset</code></dt>
+  <dt><code>kommitted_kafka_consumer_partition_offset</code></dt>
   <dd>
     <b>Description:</b> <i>The last consumed offset by the consumer of the topic partition. NOTE: '0, -1' means 'unknown'.</i><br/>
     <b>Labels:</b> <code>cluster_id, group, topic, partition, member_id, member_host, member_client_id</code><br/>
@@ -37,7 +37,7 @@
 ### Topic Partition Metrics
 
 <dl>
-  <dt><code>kcl_kafka_partition_earliest_available_offset</code></dt>
+  <dt><code>kommitted_kafka_partition_earliest_available_offset</code></dt>
   <dd>
     <b>Description:</b> <i>Earliest offset available to consumers of the topic partition.</i><br/>
     <b>Labels:</b> <code>cluster_id, topic, partition</code><br/>
@@ -47,7 +47,7 @@
 </dl>
 
 <dl>
-  <dt><code>kcl_kafka_partition_latest_available_offset</code></dt>
+  <dt><code>kommitted_kafka_partition_latest_available_offset</code></dt>
   <dd>
     <b>Description:</b> <i>Latest offset available to consumers of the topic partition.</i><br/>
     <b>Labels:</b> <code>cluster_id, topic, partition</code><br/>
@@ -59,7 +59,7 @@
 ### Topic Partition Offset Tracking Metrics
 
 <dl>
-  <dt><code>kcl_kafka_partition_earliest_tracked_offset</code></dt>
+  <dt><code>kommitted_kafka_partition_earliest_tracked_offset</code></dt>
   <dd>
     <b>Description:</b> <i>Earliest offset tracked to estimate the lag of consumers of the topic partition.</i><br/>
     <b>Labels:</b> <code>cluster_id, topic, partition</code><br/>
@@ -69,7 +69,7 @@
 </dl>
 
 <dl>
-  <dt><code>kcl_kafka_partition_latest_tracked_offset</code></dt>
+  <dt><code>kommitted_kafka_partition_latest_tracked_offset</code></dt>
   <dd>
     <b>Description:</b> <i>Latest offset tracked to estimate the lag of consumers of the topic partition.</i><br/>
     <b>Labels:</b> <code>cluster_id, topic, partition</code><br/>

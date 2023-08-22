@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use prometheus::Registry;
 
-pub const NAMESPACE: &str = "kcl";
+pub const NAMESPACE: &str = "kommitted";
 
 pub const LABEL_CLUSTER_ID: &str = "cluster_id";
 pub const LABEL_GROUP: &str = "group";
