@@ -7,9 +7,9 @@ Measure Kafka Consumer **Offset Lag** _and_ **Time Lag**
 </div>
 
 **Kommitted** is a service to measure the _Lag_ (i.e. _Latency_) of Kafka consumers.
-It works with all consumers that _commit_ their offsets into Kafka (i.e. the
-[standard way](https://kafka.apache.org/documentation/#design_consumerposition)), as it
-consumes the internal `__consumer_offsets` topic.
+It works with all consumers that _commit_ their offsets into Kafka
+(i.e. the [standard way](https://kafka.apache.org/documentation/#design_consumerposition)),
+as it consumes the internal `__consumer_offsets` topic.
 
 Metrics are exported following the [Prometheus](https://prometheus.io/)
 [Exposition formats](https://prometheus.io/docs/instrumenting/exposition_formats/#exposition-formats).
@@ -36,7 +36,12 @@ Please see the complete [list of exposed Metrics](./METRICS.md), for further det
 
 ## Getting started
 
-WIP installation
+To install `kommitted`, _currently_ you need to compile it yourself. Make sure you have
+the [Rust Toolchain](https://rustup.rs/), and then run:
+
+```shell
+$ cargo install kommitted
+```
 
 ### In Docker
 
