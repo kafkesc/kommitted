@@ -1,11 +1,12 @@
 name: Creates.io Publish
 
 on:
+  # Publish when tagged
   push:
     tags: [ "v[0-9]+.[0-9]+.[0-9]+*" ]
 
-  # TODO Remove once we have done a couple of releases and confirmed this is solid
-  workflow_dispatch:
+#  # Publish when triggered manually on GitHub UI
+#  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
