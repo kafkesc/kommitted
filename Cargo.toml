@@ -37,7 +37,7 @@ hyper = { version = "0.14.27", features = ["http1", "http2", "server", "runtime"
 konsumer_offsets = { version = "0.3.0", default-features = false, features = ["ts_chrono"] }
 log = "0.4.20"
 prometheus = "0.13.3"
-regex = "1.9.3"
+regex = "1.9.4"
 thiserror = "1.0.47"
 tokio = { version = "1.32.0", features = ["rt", "rt-multi-thread", "time", "sync", "macros"] }
 tokio-util = "0.7.8"
