@@ -43,7 +43,7 @@ tokio = { version = "1.32.0", features = ["rt", "rt-multi-thread", "time", "sync
 tokio-util = "0.7.8"
 
 [target.'cfg(unix)'.dependencies]
-rdkafka = { version = "0.33.2", features = ["ssl-vendored", "gssapi-vendored", "libz-static"] }
+rdkafka = { version = "0.34.0", features = ["ssl-vendored", "gssapi-vendored", "libz-static"] }
 
 [profile.release]
 strip = true # Automatically strip symbols from the binary.
