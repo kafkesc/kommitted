@@ -27,7 +27,7 @@ exclude = [
 [dependencies]
 async-trait = "0.1.73"
 axum = { version = "0.6.20", features = ["http2"] }
-chrono = "0.4.26"
+chrono = "0.4.28"
 clap = { version = "4.4.0", features = ["derive", "deprecated", "env", "wrap_help"] }
 const_format = "0.2.31"
 ctrlc = { version = "3.4.0", features = ["termination"] }
