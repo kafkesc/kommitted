@@ -314,7 +314,7 @@ fn interpolate_offset_to_datetime(
 ///
 /// * `utc_timestamp_ms` - Amount of milliseconds since UTC Epoch.
 fn utc_from_ms(utc_timestamp_ms: i64) -> PartitionOffsetsResult<DateTime<Utc>> {
-    Ok(DateTime::<Utc>::from_utc(
+    Ok(DateTime::<Utc>::from_naive_utc_and_offset(
         NaiveDateTime::from_timestamp_millis(utc_timestamp_ms)
             .ok_or(PartitionOffsetsError::UtcTimestampMillisInvalid(utc_timestamp_ms))?,
         Utc,
