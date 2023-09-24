@@ -1,8 +1,11 @@
+use std::net::{IpAddr, SocketAddr};
+
 use clap::{ArgGroup, Parser};
 use rdkafka::ClientConfig;
-use std::net::{SocketAddr, ToSocketAddrs};
 
-use crate::constants::{DEFAULT_HTTP_HOST, DEFAULT_HTTP_HOST_PORT, DEFAULT_HTTP_PORT};
+use crate::constants::{
+    DEFAULT_HTTP_HOST, DEFAULT_HTTP_PORT, DEFAULT_OFFSETS_HISTORY, DEFAULT_OFFSETS_HISTORY_READY_AT,
+};
 
 /// Command Line Interface, defined via the declarative,
 /// `derive` based functionality of the `clap` crate.
@@ -55,25 +58,38 @@ pub struct Cli {
     ///
     /// Once this limit is reached, the oldest data points are discarded, realising
     /// a "moving window" of offsets history.
-    #[arg(long = "history", value_name = "SIZE", default_value = "3600", verbatim_doc_comment)]
-    pub offsets_history: usize,
-
-    /// Address to listen on (i.e. bind to), to receive HTTP requests.
-    ///
-    /// In addition to the canonical 'HOST:PORT' format, it also allows for:
-    ///
-    /// * ':PORT' / 'PORT' (assumes default 'HOST')
-    /// * 'HOST:' / 'HOST' (assumes default 'PORT')
-    /// * ':'              (fallback on default)
     #[arg(
-        short,
-        long = "listen-on",
-        value_name = "HOST:PORT",
-        value_parser = socketaddr_value_parser,
-        default_value = DEFAULT_HTTP_HOST_PORT,
+        long = "history",
+        value_name = "SIZE_PER_PARTITION",
+        default_value = DEFAULT_OFFSETS_HISTORY,
         verbatim_doc_comment
     )]
-    pub listen_on: SocketAddr,
+    pub offsets_history: usize,
+
+    /// How full `--history` of Topic Partition offsets has to be (on average) for service to be ready.
+    ///
+    /// This value will be compared with the average "fullness" of each data structure containing
+    /// the offsets of Topic Partitions. Once passed, the service can start serving metrics.
+    ///
+    /// The value must be a percentage in the range `[0.0%, 100.0%]`.
+    #[arg(
+        long = "history-ready-at",
+        value_name = "FULLNESS_PERCENT_PER_PARTITION",
+        default_value = DEFAULT_OFFSETS_HISTORY_READY_AT,
+        value_parser = percent_clap_value_parser,
+        verbatim_doc_comment
+    )]
+    pub offsets_history_ready_at: f64,
+
+    /// Host address to listen on for HTTP requests.
+    ///
+    /// Supports both IPv4 and IPv6 addresses.
+    #[arg(long, default_value = DEFAULT_HTTP_HOST, verbatim_doc_comment)]
+    pub host: IpAddr,
+
+    /// Port to listen on for HTTP requests.
+    #[arg(long, default_value = DEFAULT_HTTP_PORT, verbatim_doc_comment)]
+    pub port: u16,
 
     /// Verbose logging.
     ///
@@ -98,13 +114,12 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn parse_and_validate() -> Self {
-        // TODO Implement a proper validation
-        Self::parse()
-    }
-
     pub fn verbosity_level(&self) -> i8 {
         self.verbose as i8 - self.quiet as i8
+    }
+
+    pub fn listen_on(&self) -> SocketAddr {
+        SocketAddr::from((self.host, self.port))
     }
 
     pub fn build_client_config(&self) -> ClientConfig {
@@ -136,24 +151,13 @@ fn kv_clap_value_parser(kv: &str) -> Result<KVPair, String> {
     Ok((k.to_string(), v.to_string()))
 }
 
-/// To be used as [`clap::value_parser`] function to create a [`SocketAddr`].
-fn socketaddr_value_parser(socket_addr: &str) -> Result<SocketAddr, String> {
-    let socket_addr_normalized = if socket_addr.is_empty() || socket_addr == ":" {
-        DEFAULT_HTTP_HOST_PORT.to_string()
-    } else if socket_addr.starts_with(':') {
-        format!("{DEFAULT_HTTP_HOST}{socket_addr}")
-    } else if socket_addr.ends_with(':') {
-        format!("{socket_addr}{DEFAULT_HTTP_PORT}")
-    } else if socket_addr.parse::<u16>().is_ok() {
-        format!("{DEFAULT_HTTP_HOST}:{socket_addr}")
-    } else if socket_addr.contains(':') {
-        socket_addr.to_string()
-    } else {
-        format!("{socket_addr}:{DEFAULT_HTTP_PORT}")
-    };
+fn percent_clap_value_parser(percent_str: &str) -> Result<f64, String> {
+    let percent =
+        percent_str.parse::<f64>().map_err(|e| format!("Unable to parse {percent_str}: {e}"))?;
 
-    match socket_addr_normalized.to_socket_addrs() {
-        Ok(mut iter) => iter.next().ok_or(format!("Unable to parse address '{socket_addr}'")),
-        Err(e) => Err(format!("Failed to parse address '{socket_addr}': {e}")),
+    if !(0.0..=100.0).contains(&percent) {
+        return Err(format!("Percentage value {percent} should be between [0.0%, 100.0%]"));
     }
+
+    Ok(percent)
 }

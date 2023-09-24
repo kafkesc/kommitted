@@ -24,14 +24,15 @@ use crate::internals::Emitter;
 pub fn init(
     admin_client_config: ClientConfig,
     register_offsets_history: usize,
-    ready_at: f64,
+    register_ready_at_pct: f64,
     cluster_status_register: Arc<ClusterStatusRegister>,
     shutdown_token: CancellationToken,
 ) -> (PartitionOffsetsRegister, JoinHandle<()>) {
     let (po_rx, poe_join) =
         PartitionOffsetsEmitter::new(admin_client_config, cluster_status_register)
             .spawn(shutdown_token);
-    let po_reg = PartitionOffsetsRegister::new(po_rx, register_offsets_history, ready_at);
+    let po_reg =
+        PartitionOffsetsRegister::new(po_rx, register_offsets_history, register_ready_at_pct);
 
     debug!("Initialized");
     (po_reg, poe_join)

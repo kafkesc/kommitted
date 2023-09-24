@@ -14,6 +14,7 @@ mod logging;
 mod partition_offsets;
 mod prometheus_metrics;
 
+use clap::Parser;
 use std::{error::Error, sync::Arc};
 
 use tokio_util::sync::CancellationToken;
@@ -28,8 +29,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let shutdown_token = build_shutdown_token();
 
     // Init `cluster_status` module, and await registry to be ready
-    let (cs_reg, cs_join) =
-        cluster_status::init(admin_client_config.clone(), cli.cluster_id, shutdown_token.clone());
+    let (cs_reg, cs_join) = cluster_status::init(
+        admin_client_config.clone(),
+        cli.cluster_id.clone(),
+        shutdown_token.clone(),
+    );
     cs_reg.await_ready(shutdown_token.clone()).await?;
     let cs_reg_arc = Arc::new(cs_reg);
 
@@ -37,7 +41,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let (po_reg, po_join) = partition_offsets::init(
         admin_client_config.clone(),
         cli.offsets_history,
-        0.1,
+        cli.offsets_history_ready_at,
         cs_reg_arc.clone(),
         shutdown_token.clone(),
     );
@@ -62,7 +66,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Init `http` module
     let http_fut = http::init(
-        cli.listen_on,
+        cli.listen_on(),
         cs_reg_arc.clone(),
         po_reg_arc.clone(),
         lag_reg_arc.clone(),
@@ -79,7 +83,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 fn parse_cli_and_init_logging() -> Cli {
     // Parse command line input and initialize logging
-    let cli = Cli::parse_and_validate();
+    let cli = Cli::parse();
     logging::init(cli.verbosity_level());
 
     trace!("Created:\n{:#?}", cli);

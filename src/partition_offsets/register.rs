@@ -233,6 +233,12 @@ impl PartitionOffsetsRegister {
     ///
     /// Returns the usage of the internal [`PartitionLagEstimator`]s, as `(min, max, avg, count)` tuple.
     /// `count` is the number [`TopicPartition`] this registry has a [`PartitionLagEstimator`] of.
+    ///
+    /// The register maintains a [`PartitionLagEstimator`] for each partition detected in the cluster:
+    /// each instance is set to a given `capacity` at creation time. So this is a way to know how
+    /// "full" they are, on average.
+    ///
+    /// This parameter is controlled by the [`crate::Cli`]'s `offsets_history` field.
     pub async fn get_usage(&self) -> (f64, f64, f64, usize) {
         let count = self.estimators.read().await.len();
 
@@ -265,16 +271,13 @@ impl PartitionOffsetsRegister {
 impl Awaitable for PartitionOffsetsRegister {
     async fn is_ready(&self) -> bool {
         let (min, max, avg, count) = self.get_usage().await;
-        let is_ready = avg > self.ready_at;
+        let is_ready = avg >= self.ready_at;
 
-        info!(
-            "{} usage stats:
-                tracked partitions: {count}
-                tracked offsets per partition:
-                    min={min:3.3}% / max={max:3.3}% / avg={avg:3.3}%
-                is ready: {is_ready}",
-            std::any::type_name::<PartitionOffsetsRegister>()
-        );
+        info!("
+Tracked:
+* Partitions: {count}
+* Offsets/Partition: min={min:3.3}% / max={max:3.3}% / avg={avg:3.3}%
+* Ready: {is_ready}");
 
         is_ready
     }

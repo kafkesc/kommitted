@@ -57,19 +57,33 @@ each argument can do.
   <summary>Compact: `kommitted -h`</summary>
 
   ```shell
-    Usage: kommitted [OPTIONS] --brokers <BOOTSTRAP_BROKERS>
-    
-    Options:
-    -b, --brokers <BOOTSTRAP_BROKERS>     Initial Kafka Brokers to connect to (format: 'HOST:PORT,...')
-    --client-id <CLIENT_ID>           Client identifier used by the internal Kafka (Admin) Client [default: kommitted]
-    --kafka-conf <CONF_KEY:CONF_VAL>  Additional configuration used by the internal Kafka (Admin) Client (format: 'CONF_KEY:CONF_VAL').
-    --cluster-id <CLUSTER_ID>         Override identifier of the monitored Kafka Cluster
-    --history <SIZE>                  For each Topic Partition, how much history of offsets to track in memory. [default: 3600]
-    -l, --listen-on <HOST:PORT>           Address to listen on (i.e. bind to), to receive HTTP requests. [default: localhost:9090]
-    -v, --verbose...                      Verbose logging.
-    -q, --quiet...                        Quiet logging.
-    -h, --help                            Print help (see more with '--help')
-    -V, --version                         Print version
+  Usage: kommitted [OPTIONS] --brokers <BOOTSTRAP_BROKERS>
+  
+  Options:
+    -b, --brokers <BOOTSTRAP_BROKERS>
+            Initial Kafka Brokers to connect to (format: 'HOST:PORT,...')
+        --client-id <CLIENT_ID>
+            Client identifier used by the internal Kafka (Admin) Client [default: kommitted]
+        --kafka-conf <CONF_KEY:CONF_VAL>
+            Additional configuration used by the internal Kafka (Admin) Client (format: 'CONF_KEY:CONF_VAL').
+        --cluster-id <CLUSTER_ID>
+            Override identifier of the monitored Kafka Cluster
+        --history <SIZE_PER_PARTITION>
+            For each Topic Partition, how much history of offsets to track in memory. [default: 3600]
+        --history-ready-at <FULLNESS_PERCENT_PER_PARTITION>
+            How full `--history` of Topic Partition offsets has to be (on average) for service to be ready. [default: 0.3]
+        --host <HOST>
+            Host address to listen on for HTTP requests. [default: 127.0.0.1]
+        --port <PORT>
+            Port to listen on for HTTP requests. [default: 6564]
+    -v, --verbose...
+            Verbose logging.
+    -q, --quiet...
+            Quiet logging.
+    -h, --help
+            Print help (see more with '--help')
+    -V, --version
+            Print version
   ```
 </details>
   
@@ -101,9 +115,10 @@ each argument can do.
         --cluster-id <CLUSTER_ID>
             Override identifier of the monitored Kafka Cluster.
   
-            If set, it replaces the value `cluster.id` from the Brokers' configuration. This can be useful when `cluster.id` is not actually set.
+            If set, it replaces the value `cluster.id` from the Brokers' configuration. This can be useful when `cluster.id` is not actually
+            set.
   
-        --history <SIZE>
+        --history <SIZE_PER_PARTITION>
             For each Topic Partition, how much history of offsets to track in memory.
   
             Offsets data points are collected every 500ms, on average: so, on average,
@@ -115,16 +130,27 @@ each argument can do.
   
             [default: 3600]
   
-    -l, --listen-on <HOST:PORT>
-            Address to listen on (i.e. bind to), to receive HTTP requests.
+        --history-ready-at <FULLNESS_PERCENT_PER_PARTITION>
+            How full `--history` of Topic Partition offsets has to be (on average) for service to be ready.
   
-            In addition to the canonical 'HOST:PORT' format, it also allows for:
+            This value will be compared with the average "fullness" of each data structure containing
+            the offsets of Topic Partitions. Once passed, the service can start serving metrics.
   
-            * ':PORT' / 'PORT' (assumes default 'HOST')
-            * 'HOST:' / 'HOST' (assumes default 'PORT')
-            * ':'              (fallback on default)
+            The value must be a percentage in the range `[0.0%, 100.0%]`.
   
-            [default: localhost:9090]
+            [default: 0.3]
+  
+        --host <HOST>
+            Host address to listen on for HTTP requests.
+  
+            Supports both IPv4 and IPv6 addresses.
+  
+            [default: 127.0.0.1]
+  
+        --port <PORT>
+            Port to listen on for HTTP requests.
+  
+            [default: 6564]
   
     -v, --verbose...
             Verbose logging.

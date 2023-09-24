@@ -37,7 +37,7 @@ struct HttpServiceState {
 }
 
 pub async fn init(
-    socket_addr: SocketAddr,
+    listen_on: SocketAddr,
     cs_reg: Arc<ClusterStatusRegister>,
     po_reg: Arc<PartitionOffsetsRegister>,
     lag_reg: Arc<LagRegister>,
@@ -58,11 +58,11 @@ pub async fn init(
         .route("/metrics", get(prometheus_metrics))
         .with_state(state);
 
-    let server = axum::Server::bind(&socket_addr)
+    let server = axum::Server::bind(&listen_on)
         .serve(app.into_make_service())
         .with_graceful_shutdown(shutdown_token.cancelled());
 
-    info!("Begin listening on '{}'...", socket_addr);
+    info!("Begin listening on '{}'...", listen_on);
     server
         .await
         .expect("HTTP Graceful Shutdown handler returned an error - this should never happen");
