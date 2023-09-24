@@ -220,7 +220,7 @@ async fn process_offset_commit(
                 offset_lag: match po_reg.estimate_offset_lag(&tp, oc.offset as u64).await {
                     Ok(ol) => ol,
                     Err(e) => {
-                        error!(
+                        debug!(
                             "Failed to estimate Offset Lag of Group '{}' for Topic Partition '{}': {}",
                             oc.group, tp, e
                         );
@@ -233,7 +233,7 @@ async fn process_offset_commit(
                 {
                     Ok(tl) => tl,
                     Err(e) => {
-                        error!(
+                        debug!(
                             "Failed to estimate Time Lag of Group '{}' for Topic Partition '{}': {}",
                             oc.group, tp, e
                         );
