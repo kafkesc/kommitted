@@ -48,11 +48,14 @@ pub trait Emitter {
     ) -> Result<(), mpsc::error::SendError<Self::Emitted>> {
         // Warn in case channel is saturated
         if sender.capacity() == 0 {
-            warn!(
-                "Channel to emit {} saturated: receiver too slow?",
+            trace!(
+                "Channel to emit {} saturated: receiver too slow or service still starting?",
                 std::any::type_name::<Self::Emitted>()
             );
         }
+
+        // TODO Each `Emitter` implementation should report a metric about
+        //   the current saturation of its emitting channel.
 
         // Send the object
         sender.send(emitted).await
