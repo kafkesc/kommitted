@@ -13,7 +13,7 @@ use tokio_util::sync::CancellationToken;
 use crate::constants::{KOMMITTED_CONSUMER_OFFSETS_CONSUMER, KONSUMER_OFFSETS_DATA_TOPIC};
 use crate::internals::Emitter;
 
-const CHANNEL_SIZE: usize = 2000;
+const CHANNEL_SIZE: usize = 10_000;
 
 /// Emits [`KonsumerOffsetsData`] via a provided [`mpsc::channel`].
 ///
@@ -156,7 +156,7 @@ impl Emitter for KonsumerOffsetsDataEmitter {
             match Self::assign_and_seek_to_earliest_all_partitions(&consumer_client, KONSUMER_OFFSETS_DATA_TOPIC).await
             {
                 Ok(_) => info!(
-                    "(Self) Assigned all partitions of {KONSUMER_OFFSETS_DATA_TOPIC} and sought offsets to ealiest"
+                    "(Self) Assigned all partitions of {KONSUMER_OFFSETS_DATA_TOPIC} and sought offsets to earliest"
                 ),
                 Err(e) => panic!("Failed to (self) assign '{KONSUMER_OFFSETS_DATA_TOPIC}': {e}"),
             }
