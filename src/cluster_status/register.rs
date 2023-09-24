@@ -115,7 +115,7 @@ impl ClusterStatusRegister {
     }
 
     /// Current Brokers constituting the Kafka cluster.
-    #[allow(unused)] // TODO Remove
+    #[allow(unused)]
     pub async fn get_brokers(&self) -> Vec<Broker> {
         match &*(self.latest_status.read().await) {
             None => Vec::new(),

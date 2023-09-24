@@ -15,18 +15,11 @@ use crate::lag_register::LagRegister;
 use crate::partition_offsets::PartitionOffsetsRegister;
 use crate::prometheus_metrics::bespoke::*;
 
-// TODO HTTP Endpoints
-//   GET /            - Landing page
-//   GET /metrics     - List Prometheus Metrics
-//   GET /brokers     - Cluster meta and list of Brokers
-//   GET /topics      - List of Topics
-//   GET /topics/{t}  - List of Partitions for Topic t
-//   GET /groups      - List of Consumer Groups
-//   GET /groups/{g}  - List of Members for Consumer group g
-//   GET /status/healthy - Service healthy
-//   GET /status/ready   - Service (metrics) ready
-//
-// TODO Add a layer of compression for GZip (optional for Prometheus)
+// TODO https://github.com/kafkesc/kommitted/issues/47
+// TODO https://github.com/kafkesc/kommitted/issues/48
+// TODO https://github.com/kafkesc/kommitted/issues/50
+// TODO https://github.com/kafkesc/kommitted/issues/51
+// TODO https://github.com/kafkesc/kommitted/issues/49
 
 #[derive(Clone)]
 struct HttpServiceState {
@@ -216,34 +209,14 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
     //
     // --- CLUSTER METRICS ---
     //
-    // TODO `kommitted_consumer_groups_total`
-    //   LABELS: cluster_id?
-    //
-    // TODO `kommitted_consumer_group_members_total`
-    //   LABELS: cluster_id?
-    //
-    // TODO `kommitted_cluster_status_brokers_total`
-    //   LABELS: cluster_id?
-    //
-    // TODO `kommitted_cluster_status_topics_total`
-    //   LABELS: cluster_id?
-    //
-    // TODO `kommitted_cluster_status_partitions_total`
-    //   LABELS: cluster_id?
+    // TODO https://github.com/kafkesc/kommitted/issues/53
+    // TODO https://github.com/kafkesc/kommitted/issues/54
     //
     // --- KOMMITTED INTERNAL METRICS ---
     //
-    // TODO `kommitted_consumer_groups_poll_time_seconds`
-    //   HELP: Time taken to fetch information about all consumer groups in the cluster.
-    //   LABELS: cluster_id?
-    //
-    // TODO `kommitted_cluster_status_poll_time_ms`
-    //   HELP: Time taken to fetch information about the composition of the cluster (brokers, topics, partitions).
-    //   LABELS: cluster_id?
-    //
-    // TODO `kommitted_partitions_watermark_offsets_poll_time_ms`
-    //   HELP: Time taken to fetch earliest/latest (watermark) offsets of all the topic partitions of the cluster.
-    //   LABELS: cluster_id?
+    // TODO https://github.com/kafkesc/kommitted/issues/55
+    // TODO https://github.com/kafkesc/kommitted/issues/56
+    // TODO https://github.com/kafkesc/kommitted/issues/57
 
     // Turn the bespoke metrics created so far, into a String
     let mut body = body.join("\n");

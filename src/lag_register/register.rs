@@ -55,8 +55,7 @@ pub struct LagWithOwner {
 #[derive(Debug, Clone, Default)]
 pub struct GroupWithLag {
     pub(crate) group: Group,
-    // TODO Wrap in a `RwLock` so we can modify a specific group lag,
-    //   without holding a w-lock on the whole register
+    // TODO https://github.com/kafkesc/kommitted/issues/58
     pub(crate) lag_by_topic_partition: HashMap<TopicPartition, LagWithOwner>,
 }
 
@@ -338,10 +337,7 @@ async fn process_group_metadata(
 #[async_trait]
 impl Awaitable for LagRegister {
     async fn is_ready(&self) -> bool {
-        // TODO this is pretty "weak" as readyness-check.
-        //   Something better would be to check that the registry has reached as "stable" number
-        //   of groups with a stable number of registered lags against it.
-        //   But that requires tracking changes over multiple checks: it can wait.
+        // TODO https://github.com/kafkesc/kommitted/issues/59
         self.lag_by_group.read().await.len() > 0
     }
 }
