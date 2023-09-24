@@ -2,8 +2,8 @@
 
 ## Notes
 
-* Introduced (this) [`CHANGELOG.md`](./CHANGELOG.md) and accompanying [`CHANGELOG_GUIDANCE.md`](./CHANGELOG_GUIDANCE.md) (#52)
-* Added build badges to [`README.md`](./README.md) (#62)
+* Introduced (this) [`CHANGELOG.md`](./CHANGELOG.md) and accompanying [`CHANGELOG_GUIDANCE.md`](./CHANGELOG_GUIDANCE.md) ([I#52](https://github.com/kafkesc/kommitted/issues/52))
+* Added build badges to [`README.md`](./README.md) ([I#62](https://github.com/kafkesc/kommitted/issues/62))
 
 # v0.2.0 (2023-09-24)
 
