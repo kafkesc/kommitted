@@ -273,11 +273,13 @@ impl Awaitable for PartitionOffsetsRegister {
         let (min, max, avg, count) = self.get_usage().await;
         let is_ready = avg >= self.ready_at;
 
-        info!("
+        info!(
+            "
 Tracked:
 * Partitions: {count}
 * Offsets/Partition: min={min:3.3}% / max={max:3.3}% / avg={avg:3.3}%
-* Ready: {is_ready}");
+* Ready: {is_ready}"
+        );
 
         is_ready
     }
