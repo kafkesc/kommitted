@@ -4,6 +4,11 @@
 
 Measure Kafka Consumer **Offset Lag** _and_ **Time Lag**
 
+[![CI](https://img.shields.io/github/actions/workflow/status/kafkesc/kommitted/ci.yml?branch=main&label=CI%20%28main%29&logo=Github&style=flat-square)](https://github.com/kafkesc/kommitted/actions/workflows/ci.yml)
+[![Apache 2.0](https://img.shields.io/crates/l/kommitted?logo=apache&style=flat-square)](https://github.com/search?q=repo%3Akafkesc%2Fkommitted+path%3ALICENSE&type=code)
+[![Crates.io downloads](https://img.shields.io/crates/d/kommitted?logo=rust&style=flat-square)](https://crates.io/crates/kommitted)
+[![](https://img.shields.io/crates/v/kommitted?label=latest%20version&logo=rust&style=flat-square)](https://crates.io/crates/kommitted/versions)
+
 </div>
 
 **Kommitted** is a service to measure the _Lag_ (i.e. _Latency_) of Kafka consumers.
@@ -193,7 +198,7 @@ $ kommitted \
 
 ### Log verbosity
 
-Ksunami follows the long tradition of `-v/-q` to control the verbosity of it's logging:
+Kommitted follows the long tradition of `-v/-q` to control the verbosity of it's logging:
 
 | Arguments | Log verbosity level | Default |
 |----------:|:--------------------|:-------:|
