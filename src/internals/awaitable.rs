@@ -3,7 +3,7 @@ use thiserror::Error;
 use tokio::{time::interval, time::Duration};
 use tokio_util::sync::CancellationToken;
 
-const READYNESS_CHECK_INTERVAL: Duration = Duration::from_millis(500);
+const READYNESS_CHECK_INTERVAL: Duration = Duration::from_secs(1);
 
 /// An [`Self`] is something that we can wait upon for it to be _ready_.
 ///
