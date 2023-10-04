@@ -20,6 +20,8 @@ categories = [
 exclude = [
     ".github/",
     ".gitignore",
+    "Dockerfile",
+    "CHANGELOG_GUIDANCE.md",
 ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

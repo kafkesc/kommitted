@@ -41,8 +41,8 @@ Please see the complete [list of exposed Metrics](./METRICS.md), for further det
 
 ## Getting started
 
-To install `kommitted`, _currently_ you need to compile it yourself. Make sure you have
-the [Rust Toolchain](https://rustup.rs/), and then run:
+To install `kommitted`, you need to compile it yourself, or use the [Docker image](#in-docker).
+If you have the [Rust Toolchain](https://rustup.rs/) already setup, then just run:
 
 ```shell
 $ cargo install kommitted
@@ -50,7 +50,10 @@ $ cargo install kommitted
 
 ### In Docker
 
-WIP
+Kommitted is now available as a Docker Image: [`kafkesc/kommitted`](https://hub.docker.com/r/kafkesc/kommitted)
+on the Docker Hub registry. Both `linux/amd64` and `linux/arm64` images are available, based on Debian slim images.
+
+The `ENTRYPOINT` is the `kommitted` binary itself, so you can just pass arguments to the container execution.
 
 ## Usage
 
