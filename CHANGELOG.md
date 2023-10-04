@@ -1,9 +1,14 @@
 # vNEXT (2023-??-??)
 
+## Features
+
+* Setup GitHub Actions Workflow to publish Docker image [`kafkesc/kommitted`](https://hub.docker.com/r/kafkesc/kommitted) at every release ([I#64](https://github.com/kafkesc/kommitted/issues/64)) 
+
 ## Notes
 
 * Introduced (this) [`CHANGELOG.md`](./CHANGELOG.md) and accompanying [`CHANGELOG_GUIDANCE.md`](./CHANGELOG_GUIDANCE.md) ([I#52](https://github.com/kafkesc/kommitted/issues/52))
 * Added build badges to [`README.md`](./README.md) ([I#62](https://github.com/kafkesc/kommitted/issues/62))
+* Multiple rounds of dependencies upgrade
 
 # v0.2.0 (2023-09-24)
 
