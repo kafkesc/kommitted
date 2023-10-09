@@ -1,3 +1,9 @@
+# vNEXT (????-??-??)
+
+## Enhancements
+
+* Reworked workflows that publish Docker image: triggering 1 dedicated workflow per target ([I#80](https://github.com/kafkesc/kommitted/issues/80))
+
 # v0.2.1 (2023-10-04)
 
 ## Features

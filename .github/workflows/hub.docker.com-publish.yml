@@ -37,7 +37,7 @@ on:
 
 jobs:
   publish:
-    name: Build & Publish (${{ inputs.dockerhub-org }}/${{ inputs.dockerhub-imagename }}:${{ inputs.release-version }})
+    name: Build & Publish ${{ inputs.dockerhub-org }}/${{ inputs.dockerhub-imagename }}:${{ inputs.release-version }} for ${{ inputs.target-platforms }}
 
     runs-on: ubuntu-latest
 
