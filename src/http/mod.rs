@@ -100,7 +100,6 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
     consumer_partition_offset::append_headers(&mut body);
     iter_lag_reg(&state.lag_reg, &mut body, &cluster_id, consumer_partition_offset::append_metric)
         .await;
-    body.push(String::new());
 
     // ------------------------------------------------------- METRIC: consumer_partition_lag_offset
     consumer_partition_lag_offset::append_headers(&mut body);
@@ -111,7 +110,6 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
         consumer_partition_lag_offset::append_metric,
     )
     .await;
-    body.push(String::new());
 
     // ------------------------------------------------- METRIC: consumer_partition_lag_milliseconds
     consumer_partition_lag_milliseconds::append_headers(&mut body);
@@ -122,7 +120,6 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
         consumer_partition_lag_milliseconds::append_metric,
     )
     .await;
-    body.push(String::new());
 
     // ------------------------------------------------- METRIC: partition_earliest_available_offset
     partition_earliest_available_offset::append_headers(&mut body);
@@ -142,7 +139,6 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
             },
         }
     }
-    body.push(String::new());
 
     // ------------------------------------------------- METRIC: partition_latest_available_offset
     partition_latest_available_offset::append_headers(&mut body);
@@ -162,7 +158,6 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
             },
         }
     }
-    body.push(String::new());
 
     // ------------------------------------------------- METRIC: partition_earliest_tracked_offset
     partition_earliest_tracked_offset::append_headers(&mut body);
@@ -183,7 +178,6 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
             },
         }
     }
-    body.push(String::new());
 
     // ------------------------------------------------- METRIC: partition_latest_tracked_offset
     partition_latest_tracked_offset::append_headers(&mut body);
@@ -204,13 +198,11 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
             },
         }
     }
-    body.push(String::new());
 
-    //
     // --- CLUSTER METRICS ---
     //
     // TODO https://github.com/kafkesc/kommitted/issues/54
-    //
+
     // --- KOMMITTED INTERNAL METRICS ---
     //
     // TODO https://github.com/kafkesc/kommitted/issues/56
@@ -219,7 +211,7 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
     // Turn the bespoke metrics created so far, into a String
     let mut body = body.join("\n");
 
-    // Append the the bespoke metrics, internal (normal?) Prometheus Metrics
+    // Append to the bespoke metrics, classic Prometheus Metrics
     let metrics_family = state.metrics.gather();
     if let Err(e) = TextEncoder.encode_utf8(&metrics_family, &mut body) {
         status = StatusCode::INTERNAL_SERVER_ERROR;
