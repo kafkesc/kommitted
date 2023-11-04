@@ -87,6 +87,54 @@ Below is the list of the current Metrics exposed by Kommitted.
   </dd>
 </dl>
 
+### Cluster Metrics
+
+Those are metrics specific to the component in Kommitted that fetches the set of Consumer Groups and Members from
+the Kafka cluster, and sends it to the rest of the system for further processing (i.e. to know which consumer groups
+to produce the lag information for).
+
+<dl>
+  <dt><code>kmtd_consumer_groups_total</code></dt>
+  <dd>
+    <b>Description:</b> <i>"Consumer groups currently in the cluster.</i><br/>
+    <b>Labels:</b> <code>cluster_id</code><br/>
+    <b>Type:</b> <code>gauge</code><br/>
+    <b>Timestamped:</b> <code>true</code>
+  </dd>
+</dl>
+
+<dl>
+  <dt><code>kmtd_consumer_groups_members_total</code></dt>
+  <dd>
+    <b>Description:</b> <i>Members of consumer groups currently in the cluster.</i><br/>
+    <b>Labels:</b> <code>cluster_id, group</code><br/>
+    <b>Type:</b> <code>gauge</code><br/>
+    <b>Timestamped:</b> <code>true</code>
+  </dd>
+</dl>
+
+### Kommitted (internal) Metrics
+
+<dl>
+  <dt><code>kmtd_consumer_groups_emitter_fetch_time_milliseconds</code></dt>
+  <dd>
+    <b>Description:</b> <i>Time (in milliseconds) taken to fetch information about all consumer groups in cluster.</i><br/>
+    <b>Labels:</b> <code>cluster_id</code><br/>
+    <b>Type:</b> <code>histogram</code><br/>
+    <b>Timestamped:</b> <code>true</code>
+  </dd>
+</dl>
+
+<dl>
+  <dt><code>kmtd_consumer_groups_emitter_channel_capacity</code></dt>
+  <dd>
+    <b>Description:</b> <i>Capacity of internal channel used to send consumer groups metadata to rest of the service.</i><br/>
+    <b>Labels:</b> <code>cluster_id</code><br/>
+    <b>Type:</b> <code>gauge</code><br/>
+    <b>Timestamped:</b> <code>true</code>
+  </dd>
+</dl>
+
 ## Labels
 
 Each metrics has some or all of the following labels applied; what labels applies
