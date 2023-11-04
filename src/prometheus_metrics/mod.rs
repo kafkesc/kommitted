@@ -18,6 +18,7 @@ pub const UNKNOWN_VAL: &str = "UNKNOWN";
 
 pub fn init(cluster_id: String) -> Registry {
     let prom_def_labels = HashMap::from([(LABEL_CLUSTER_ID.to_string(), cluster_id)]);
+
     Registry::new_custom(Some(NAMESPACE.to_string()), Some(prom_def_labels))
         .expect("Unable to create a Prometheus Metrics Registry")
 }

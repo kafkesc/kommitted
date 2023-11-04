@@ -37,6 +37,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     cs_reg.await_ready(shutdown_token.clone()).await?;
     let cs_reg_arc = Arc::new(cs_reg);
 
+    // Init `prometheus_metrics` module
+    let prom_reg = prometheus_metrics::init(cs_reg_arc.get_cluster_id().await);
+    let prom_reg_arc = Arc::new(prom_reg);
+
     // Init `partition_offsets` module, and await registry to be ready
     let (po_reg, po_join) = partition_offsets::init(
         admin_client_config.clone(),
@@ -53,16 +57,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
         konsumer_offsets_data::init(admin_client_config.clone(), shutdown_token.clone());
 
     // Init `consumer_groups` module
-    let (cg_rx, cg_join) =
-        consumer_groups::init(admin_client_config.clone(), shutdown_token.clone());
+    let (cg_rx, cg_join) = consumer_groups::init(
+        admin_client_config.clone(),
+        shutdown_token.clone(),
+        prom_reg_arc.clone(),
+    );
 
     // Init `lag_register` module, and await registry to be ready
     let lag_reg = lag_register::init(cg_rx, kod_rx, po_reg_arc.clone());
     lag_reg.await_ready(shutdown_token.clone()).await?;
     let lag_reg_arc = Arc::new(lag_reg);
-
-    // Init `prometheus_metrics` module
-    let prom_reg = prometheus_metrics::init(cs_reg_arc.get_cluster_id().await);
 
     // Init `http` module
     let http_fut = http::init(
@@ -71,7 +75,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         po_reg_arc.clone(),
         lag_reg_arc.clone(),
         shutdown_token.clone(),
-        Arc::new(prom_reg),
+        prom_reg_arc.clone(),
     );
 
     // Join all the async tasks, then let it terminate
