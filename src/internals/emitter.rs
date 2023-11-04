@@ -56,7 +56,6 @@ pub trait Emitter {
 
         // TODO Each `Emitter` implementation should report a metric about
         //   the current saturation of its emitting channel.
-        //   See https://github.com/kafkesc/kommitted/issues/55
         //   See https://github.com/kafkesc/kommitted/issues/56
         //   See https://github.com/kafkesc/kommitted/issues/57
 

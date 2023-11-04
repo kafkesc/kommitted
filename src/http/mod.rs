@@ -209,12 +209,10 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
     //
     // --- CLUSTER METRICS ---
     //
-    // TODO https://github.com/kafkesc/kommitted/issues/53
     // TODO https://github.com/kafkesc/kommitted/issues/54
     //
     // --- KOMMITTED INTERNAL METRICS ---
     //
-    // TODO https://github.com/kafkesc/kommitted/issues/55
     // TODO https://github.com/kafkesc/kommitted/issues/56
     // TODO https://github.com/kafkesc/kommitted/issues/57
 
