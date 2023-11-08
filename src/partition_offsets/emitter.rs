@@ -2,6 +2,11 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use const_format::formatcp;
+use prometheus::{
+    register_histogram_vec_with_registry, register_int_gauge_with_registry, HistogramVec, IntGauge,
+    Registry,
+};
 use rdkafka::{admin::AdminClient, client::DefaultClientContext, ClientConfig};
 use tokio::{
     sync::mpsc,
@@ -12,11 +17,20 @@ use tokio_util::sync::CancellationToken;
 
 use crate::cluster_status::ClusterStatusRegister;
 use crate::internals::Emitter;
+use crate::prometheus_metrics::{LABEL_PARTITION, LABEL_TOPIC, NAMESPACE};
 
 const CHANNEL_SIZE: usize = 10_000;
 
 const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 const FETCH_INTERVAL: Duration = Duration::from_millis(10);
+
+const M_CG_FETCH_NAME: &str =
+    formatcp!("{NAMESPACE}_partition_offsets_emitter_fetch_time_milliseconds");
+const M_CG_FETCH_HELP: &str =
+    "Time (ms) taken to fetch earliest/latest (watermark) offsets of a specific topic partition in cluster";
+const M_CG_CH_CAP_NAME: &str = formatcp!("{NAMESPACE}_partition_offsets_emitter_channel_capacity");
+const M_CG_CH_CAP_HELP: &str =
+    "Capacity of internal channel used to send partition watermark offsets to rest of the service";
 
 /// Offset information for a Topic Partition.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
@@ -43,6 +57,10 @@ pub struct PartitionOffset {
 pub struct PartitionOffsetsEmitter {
     client_config: ClientConfig,
     cluster_register: Arc<ClusterStatusRegister>,
+
+    // Prometheus Metrics
+    metric_cg_fetch: HistogramVec,
+    metric_cg_ch_cap: IntGauge,
 }
 
 impl PartitionOffsetsEmitter {
@@ -51,10 +69,27 @@ impl PartitionOffsetsEmitter {
     /// # Arguments
     ///
     /// * `client_config` - Kafka client configuration, used to fetch the Topic Partitions offset watermarks (earliest, latest)
-    pub fn new(client_config: ClientConfig, cluster_register: Arc<ClusterStatusRegister>) -> Self {
+    pub fn new(
+        client_config: ClientConfig,
+        cluster_register: Arc<ClusterStatusRegister>,
+        metrics: Arc<Registry>,
+    ) -> Self {
         Self {
             client_config,
             cluster_register,
+            metric_cg_fetch: register_histogram_vec_with_registry!(
+                M_CG_FETCH_NAME,
+                M_CG_FETCH_HELP,
+                &[LABEL_TOPIC, LABEL_PARTITION],
+                metrics
+            )
+            .unwrap_or_else(|_| panic!("Failed to create metric: {M_CG_FETCH_NAME}")),
+            metric_cg_ch_cap: register_int_gauge_with_registry!(
+                M_CG_CH_CAP_NAME,
+                M_CG_CH_CAP_HELP,
+                metrics
+            )
+            .unwrap_or_else(|_| panic!("Failed to create metric: {M_CG_CH_CAP_NAME}")),
         }
     }
 }
@@ -82,6 +117,10 @@ impl Emitter for PartitionOffsetsEmitter {
 
         let (sx, rx) = mpsc::channel::<PartitionOffset>(CHANNEL_SIZE);
 
+        // Clone metrics so they can be used in the spawned future
+        let metric_cg_fetch = self.metric_cg_fetch.clone();
+        let metric_cg_ch_cap = self.metric_cg_ch_cap.clone();
+
         let csr = self.cluster_register.clone();
         let join_handle = tokio::spawn(async move {
             let mut interval = interval(FETCH_INTERVAL);
@@ -90,13 +129,15 @@ impl Emitter for PartitionOffsetsEmitter {
                 for t in csr.get_topics().await {
                     trace!("Fetching earliest/latest offset for Partitions of Topic '{}'", t);
 
-                    for p in csr.get_partitions_for_topic(t.as_str()).await.unwrap_or_default() {
-                        match admin_client.inner().fetch_watermarks(
-                            t.as_str(),
-                            p as i32,
-                            FETCH_TIMEOUT,
-                        ) {
+                    for p in csr.get_partitions_for_topic(&t).await.unwrap_or_default() {
+                        let timer =
+                            metric_cg_fetch.with_label_values(&[&t, &p.to_string()]).start_timer();
+
+                        match admin_client.inner().fetch_watermarks(&t, p as i32, FETCH_TIMEOUT) {
                             Ok((earliest, latest)) => {
+                                // Update fetching time metric for (topic,partition) tuple
+                                timer.observe_duration();
+
                                 let po = PartitionOffset {
                                     topic: t.clone(),
                                     partition: p,
@@ -104,6 +145,9 @@ impl Emitter for PartitionOffsetsEmitter {
                                     latest_offset: latest as u64,
                                     read_datetime: Utc::now(),
                                 };
+
+                                // Update channel capacity metric
+                                metric_cg_ch_cap.set(sx.capacity() as i64);
 
                                 tokio::select! {
                                     res = Self::emit(&sx, po) => {
