@@ -99,7 +99,7 @@ to produce the lag information for).
     <b>Description:</b> <i>"Consumer groups currently in the cluster.</i><br/>
     <b>Labels:</b> <code>cluster_id</code><br/>
     <b>Type:</b> <code>gauge</code><br/>
-    <b>Timestamped:</b> <code>true</code>
+    <b>Timestamped:</b> <code>false</code>
   </dd>
 </dl>
 
@@ -109,7 +109,7 @@ to produce the lag information for).
     <b>Description:</b> <i>Members of consumer groups currently in the cluster.</i><br/>
     <b>Labels:</b> <code>cluster_id, group</code><br/>
     <b>Type:</b> <code>gauge</code><br/>
-    <b>Timestamped:</b> <code>true</code>
+    <b>Timestamped:</b> <code>false</code>
   </dd>
 </dl>
 
@@ -118,10 +118,10 @@ to produce the lag information for).
 <dl>
   <dt><code>kmtd_consumer_groups_emitter_fetch_time_milliseconds</code></dt>
   <dd>
-    <b>Description:</b> <i>Time (in milliseconds) taken to fetch information about all consumer groups in cluster.</i><br/>
+    <b>Description:</b> <i>Time (ms) taken to fetch information about all consumer groups in cluster.</i><br/>
     <b>Labels:</b> <code>cluster_id</code><br/>
     <b>Type:</b> <code>histogram</code><br/>
-    <b>Timestamped:</b> <code>true</code>
+    <b>Timestamped:</b> <code>false</code>
   </dd>
 </dl>
 
@@ -131,7 +131,27 @@ to produce the lag information for).
     <b>Description:</b> <i>Capacity of internal channel used to send consumer groups metadata to rest of the service.</i><br/>
     <b>Labels:</b> <code>cluster_id</code><br/>
     <b>Type:</b> <code>gauge</code><br/>
-    <b>Timestamped:</b> <code>true</code>
+    <b>Timestamped:</b> <code>false</code>
+  </dd>
+</dl>
+
+<dl>
+  <dt><code>kmtd_partition_offsets_emitter_fetch_time_milliseconds</code></dt>
+  <dd>
+    <b>Description:</b> <i>Time (ms) taken to fetch earliest/latest (watermark) offsets of a specific topic partition in cluster.</i><br/>
+    <b>Labels:</b> <code>cluster_id, topic, partition</code><br/>
+    <b>Type:</b> <code>histogram</code><br/>
+    <b>Timestamped:</b> <code>false</code>
+  </dd>
+</dl>
+
+<dl>
+  <dt><code>kmtd_partition_offsets_emitter_channel_capacity</code></dt>
+  <dd>
+    <b>Description:</b> <i>Capacity of internal channel used to send partition watermark offsets to rest of the service.</i><br/>
+    <b>Labels:</b> <code>cluster_id</code><br/>
+    <b>Type:</b> <code>gauge</code><br/>
+    <b>Timestamped:</b> <code>false</code>
   </dd>
 </dl>
 
