@@ -2,6 +2,8 @@ use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
+use const_format::formatcp;
+use prometheus::{register_int_gauge_vec_with_registry, IntGaugeVec, Registry};
 use tokio::sync::{mpsc::Receiver, RwLock};
 
 use super::emitter::PartitionOffset;
@@ -11,6 +13,10 @@ use super::lag_estimator::PartitionLagEstimator;
 use crate::internals::Awaitable;
 use crate::kafka_types::TopicPartition;
 use crate::partition_offsets::tracked_offset::TrackedOffset;
+use crate::prometheus_metrics::{LABEL_PARTITION, LABEL_TOPIC, NAMESPACE};
+
+const MET_USAGE_NAME: &str = formatcp!("{NAMESPACE}_partition_offsets_register_usage");
+const MET_USAGE_HELP: &str = "Amount of offsets tracked per topic partition";
 
 /// Holds the offset of all Topic Partitions in the Kafka Cluster, and can estimate lag of Consumers.
 ///
@@ -18,6 +24,9 @@ use crate::partition_offsets::tracked_offset::TrackedOffset;
 pub struct PartitionOffsetsRegister {
     estimators: Arc<RwLock<HashMap<TopicPartition, RwLock<PartitionLagEstimator>>>>,
     ready_at: f64,
+
+    // Prometheus Metrics
+    metric_usage: IntGaugeVec,
 }
 
 impl PartitionOffsetsRegister {
@@ -32,15 +41,30 @@ impl PartitionOffsetsRegister {
     ///   at what moment in time that particular offset was valid.
     /// * `ready_at` - Percentage at which [`Self`] can be considered ready.
     ///   NOTE: [`Self`] is an [`Awaitable`].
-    pub fn new(mut rx: Receiver<PartitionOffset>, offsets_history: usize, ready_at: f64) -> Self {
+    pub fn new(
+        mut rx: Receiver<PartitionOffset>,
+        offsets_history: usize,
+        ready_at: f64,
+        metrics: Arc<Registry>,
+    ) -> Self {
         let por = Self {
             estimators: Arc::new(RwLock::new(HashMap::new())),
             ready_at,
+            metric_usage: register_int_gauge_vec_with_registry!(
+                MET_USAGE_NAME,
+                MET_USAGE_HELP,
+                &[LABEL_TOPIC, LABEL_PARTITION],
+                metrics
+            )
+            .unwrap_or_else(|_| panic!("Failed to create metric: {MET_USAGE_NAME}")),
         };
 
         // A clone of the `por.estimator` will be moved into the async task
         // that updates the register.
         let estimators_clone = por.estimators.clone();
+
+        // Clone metrics so they can be used in the spawned future
+        let metric_usage = por.metric_usage.clone();
 
         // The Register is essentially "self updating" its data, by listening
         // on a channel for updates.
@@ -71,14 +95,24 @@ impl PartitionOffsetsRegister {
                         }
 
                         trace!("Updating Partition: {:?}", k);
-                        // Second, update the PartitionLagEstimator for this Key
-                        w_guard
-                            .downgrade() //< Here the exclusive write lock, becomes a read lock
+                        // The exclusive write lock, becomes a read lock
+                        let r_guard = w_guard.downgrade();
+
+                        // Get exclusive write lock on the specific partition esimator
+                        let estimator_rwlock = r_guard
                             .get(&k)
-                            .unwrap_or_else(|| panic!("{} for {:#?} could not be found: this should never happen!", std::any::type_name::<PartitionLagEstimator>(), k))
+                            .unwrap_or_else(|| panic!("{} for {:#?} could not be found: this should never happen!", std::any::type_name::<PartitionLagEstimator>(), k));
+
+                        // Update the PartitionLagEstimator
+                        estimator_rwlock
                             .write()
                             .await
                             .update(po.earliest_offset, po.latest_offset, po.read_datetime);
+
+                        // Update metric
+                        metric_usage
+                            .with_label_values(&[&k.topic, &k.partition.to_string()])
+                            .set(estimator_rwlock.read().await.usage() as i64);
                     },
                     else => {
                         info!("Emitters stopping: breaking (internal) loop");

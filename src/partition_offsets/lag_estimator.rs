@@ -227,6 +227,11 @@ impl PartitionLagEstimator {
         }
     }
 
+    /// How many [`TrackedOffset`] are stored.
+    pub fn usage(&self) -> usize {
+        self.latest_tracked_offsets.len()
+    }
+
     /// Given the constructor-time `capacity`, how much capacity is left spare, before
     /// a new [`PartitionLagEstimator::update()`] call will need to drop the earliest tracked?
     pub fn spare_capacity(&self) -> usize {

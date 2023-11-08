@@ -31,10 +31,10 @@ pub fn init(
     metrics: Arc<Registry>,
 ) -> (PartitionOffsetsRegister, JoinHandle<()>) {
     let (po_rx, poe_join) =
-        PartitionOffsetsEmitter::new(admin_client_config, cluster_status_register, metrics)
+        PartitionOffsetsEmitter::new(admin_client_config, cluster_status_register, metrics.clone())
             .spawn(shutdown_token);
     let po_reg =
-        PartitionOffsetsRegister::new(po_rx, register_offsets_history, register_ready_at_pct);
+        PartitionOffsetsRegister::new(po_rx, register_offsets_history, register_ready_at_pct, metrics);
 
     debug!("Initialized");
     (po_reg, poe_join)
