@@ -2,7 +2,6 @@ use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
-use const_format::formatcp;
 use prometheus::{register_int_gauge_vec_with_registry, IntGaugeVec, Registry};
 use tokio::sync::{mpsc::Receiver, RwLock};
 
@@ -13,9 +12,9 @@ use super::lag_estimator::PartitionLagEstimator;
 use crate::internals::Awaitable;
 use crate::kafka_types::TopicPartition;
 use crate::partition_offsets::tracked_offset::TrackedOffset;
-use crate::prometheus_metrics::{LABEL_PARTITION, LABEL_TOPIC, NAMESPACE};
+use crate::prometheus_metrics::{LABEL_PARTITION, LABEL_TOPIC};
 
-const MET_USAGE_NAME: &str = formatcp!("{NAMESPACE}_partition_offsets_register_usage");
+const MET_USAGE_NAME: &str = "partition_offsets_register_usage";
 const MET_USAGE_HELP: &str = "Amount of offsets tracked per topic partition";
 
 /// Holds the offset of all Topic Partitions in the Kafka Cluster, and can estimate lag of Consumers.

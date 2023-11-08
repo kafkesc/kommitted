@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use const_format::formatcp;
 use prometheus::{
     register_histogram_vec_with_registry, register_int_gauge_with_registry, HistogramVec, IntGauge,
     Registry,
@@ -17,18 +16,17 @@ use tokio_util::sync::CancellationToken;
 
 use crate::cluster_status::ClusterStatusRegister;
 use crate::internals::Emitter;
-use crate::prometheus_metrics::{LABEL_PARTITION, LABEL_TOPIC, NAMESPACE};
+use crate::prometheus_metrics::{LABEL_PARTITION, LABEL_TOPIC};
 
 const CHANNEL_SIZE: usize = 10_000;
 
 const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 const FETCH_INTERVAL: Duration = Duration::from_millis(10);
 
-const MET_FETCH_NAME: &str =
-    formatcp!("{NAMESPACE}_partition_offsets_emitter_fetch_time_milliseconds");
+const MET_FETCH_NAME: &str = "_partition_offsets_emitter_fetch_time_milliseconds";
 const MET_FETCH_HELP: &str =
     "Time (ms) taken to fetch earliest/latest (watermark) offsets of a specific topic partition in cluster";
-const MET_CH_CAP_NAME: &str = formatcp!("{NAMESPACE}_partition_offsets_emitter_channel_capacity");
+const MET_CH_CAP_NAME: &str = "_partition_offsets_emitter_channel_capacity";
 const MET_CH_CAP_HELP: &str =
     "Capacity of internal channel used to send partition watermark offsets to rest of the service";
 

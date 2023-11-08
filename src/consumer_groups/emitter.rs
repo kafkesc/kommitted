@@ -4,7 +4,6 @@ use std::{
 };
 
 use async_trait::async_trait;
-use const_format::formatcp;
 use konsumer_offsets::ConsumerProtocolAssignment;
 use prometheus::{
     register_histogram_with_registry, register_int_gauge_vec_with_registry,
@@ -21,22 +20,21 @@ use tokio_util::sync::CancellationToken;
 use crate::constants::KOMMITTED_CONSUMER_OFFSETS_CONSUMER;
 use crate::internals::Emitter;
 use crate::kafka_types::{Group, GroupWithMembers, Member, MemberWithAssignment, TopicPartition};
-use crate::prometheus_metrics::{LABEL_GROUP, NAMESPACE};
+use crate::prometheus_metrics::LABEL_GROUP;
 
 const CHANNEL_SIZE: usize = 5;
 
 const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 const FETCH_INTERVAL: Duration = Duration::from_secs(60);
 
-const MET_TOT_NAME: &str = formatcp!("{NAMESPACE}_consumer_groups_total");
+const MET_TOT_NAME: &str = "consumer_groups_total";
 const MET_TOT_HELP: &str = "Consumer groups currently in the cluster";
-const MET_MEMBERS_TOT_NAME: &str = formatcp!("{NAMESPACE}_consumer_groups_members_total");
+const MET_MEMBERS_TOT_NAME: &str = "consumer_groups_members_total";
 const MET_MEMBERS_TOT_HELP: &str = "Members of consumer groups currently in the cluster";
-const MET_FETCH_NAME: &str =
-    formatcp!("{NAMESPACE}_consumer_groups_emitter_fetch_time_milliseconds");
+const MET_FETCH_NAME: &str = "consumer_groups_emitter_fetch_time_milliseconds";
 const MET_FETCH_HELP: &str =
     "Time (ms) taken to fetch information about all consumer groups in cluster";
-const MET_CH_CAP_NAME: &str = formatcp!("{NAMESPACE}_consumer_groups_emitter_channel_capacity");
+const MET_CH_CAP_NAME: &str = "consumer_groups_emitter_channel_capacity";
 const MET_CH_CAP_HELP: &str =
     "Capacity of internal channel used to send consumer groups metadata to rest of the service";
 
