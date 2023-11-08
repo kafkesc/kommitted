@@ -155,6 +155,16 @@ to produce the lag information for).
   </dd>
 </dl>
 
+<dl>
+  <dt><code>kmtd_partition_offsets_register_usage</code></dt>
+  <dd>
+    <b>Description:</b> <i>Amount of offsets tracked per topic partition.</i><br/>
+    <b>Labels:</b> <code>cluster_id, topic, partition</code><br/>
+    <b>Type:</b> <code>gauge</code><br/>
+    <b>Timestamped:</b> <code>false</code>
+  </dd>
+</dl>
+
 ## Labels
 
 Each metrics has some or all of the following labels applied; what labels applies
