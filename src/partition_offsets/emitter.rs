@@ -24,12 +24,12 @@ const CHANNEL_SIZE: usize = 10_000;
 const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 const FETCH_INTERVAL: Duration = Duration::from_millis(10);
 
-const M_CG_FETCH_NAME: &str =
+const MET_FETCH_NAME: &str =
     formatcp!("{NAMESPACE}_partition_offsets_emitter_fetch_time_milliseconds");
-const M_CG_FETCH_HELP: &str =
+const MET_FETCH_HELP: &str =
     "Time (ms) taken to fetch earliest/latest (watermark) offsets of a specific topic partition in cluster";
-const M_CG_CH_CAP_NAME: &str = formatcp!("{NAMESPACE}_partition_offsets_emitter_channel_capacity");
-const M_CG_CH_CAP_HELP: &str =
+const MET_CH_CAP_NAME: &str = formatcp!("{NAMESPACE}_partition_offsets_emitter_channel_capacity");
+const MET_CH_CAP_HELP: &str =
     "Capacity of internal channel used to send partition watermark offsets to rest of the service";
 
 /// Offset information for a Topic Partition.
@@ -59,8 +59,8 @@ pub struct PartitionOffsetsEmitter {
     cluster_register: Arc<ClusterStatusRegister>,
 
     // Prometheus Metrics
-    metric_cg_fetch: HistogramVec,
-    metric_cg_ch_cap: IntGauge,
+    metric_fetch: HistogramVec,
+    metric_ch_cap: IntGauge,
 }
 
 impl PartitionOffsetsEmitter {
@@ -77,19 +77,19 @@ impl PartitionOffsetsEmitter {
         Self {
             client_config,
             cluster_register,
-            metric_cg_fetch: register_histogram_vec_with_registry!(
-                M_CG_FETCH_NAME,
-                M_CG_FETCH_HELP,
+            metric_fetch: register_histogram_vec_with_registry!(
+                MET_FETCH_NAME,
+                MET_FETCH_HELP,
                 &[LABEL_TOPIC, LABEL_PARTITION],
                 metrics
             )
-            .unwrap_or_else(|_| panic!("Failed to create metric: {M_CG_FETCH_NAME}")),
-            metric_cg_ch_cap: register_int_gauge_with_registry!(
-                M_CG_CH_CAP_NAME,
-                M_CG_CH_CAP_HELP,
+            .unwrap_or_else(|_| panic!("Failed to create metric: {MET_FETCH_NAME}")),
+            metric_ch_cap: register_int_gauge_with_registry!(
+                MET_CH_CAP_NAME,
+                MET_CH_CAP_HELP,
                 metrics
             )
-            .unwrap_or_else(|_| panic!("Failed to create metric: {M_CG_CH_CAP_NAME}")),
+            .unwrap_or_else(|_| panic!("Failed to create metric: {MET_CH_CAP_NAME}")),
         }
     }
 }
@@ -118,8 +118,8 @@ impl Emitter for PartitionOffsetsEmitter {
         let (sx, rx) = mpsc::channel::<PartitionOffset>(CHANNEL_SIZE);
 
         // Clone metrics so they can be used in the spawned future
-        let metric_cg_fetch = self.metric_cg_fetch.clone();
-        let metric_cg_ch_cap = self.metric_cg_ch_cap.clone();
+        let metric_cg_fetch = self.metric_fetch.clone();
+        let metric_cg_ch_cap = self.metric_ch_cap.clone();
 
         let csr = self.cluster_register.clone();
         let join_handle = tokio::spawn(async move {
