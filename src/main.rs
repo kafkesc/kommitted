@@ -48,6 +48,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         cli.offsets_history_ready_at,
         cs_reg_arc.clone(),
         shutdown_token.clone(),
+        prom_reg_arc.clone(),
     );
     po_reg.await_ready(shutdown_token.clone()).await?;
     let po_reg_arc = Arc::new(po_reg);

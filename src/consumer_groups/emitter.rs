@@ -4,9 +4,11 @@ use std::{
 };
 
 use async_trait::async_trait;
-use const_format::formatcp;
 use konsumer_offsets::ConsumerProtocolAssignment;
-use prometheus::{Histogram, HistogramOpts, IntGauge, IntGaugeVec, Opts, Registry};
+use prometheus::{
+    register_histogram_with_registry, register_int_gauge_vec_with_registry,
+    register_int_gauge_with_registry, Histogram, IntGauge, IntGaugeVec, Registry,
+};
 use rdkafka::{admin::AdminClient, client::DefaultClientContext, groups::GroupList, ClientConfig};
 use tokio::{
     sync::mpsc,
@@ -18,23 +20,22 @@ use tokio_util::sync::CancellationToken;
 use crate::constants::KOMMITTED_CONSUMER_OFFSETS_CONSUMER;
 use crate::internals::Emitter;
 use crate::kafka_types::{Group, GroupWithMembers, Member, MemberWithAssignment, TopicPartition};
-use crate::prometheus_metrics::{LABEL_GROUP, NAMESPACE};
+use crate::prometheus_metrics::LABEL_GROUP;
 
 const CHANNEL_SIZE: usize = 5;
 
 const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 const FETCH_INTERVAL: Duration = Duration::from_secs(60);
 
-const M_CG_NAME: &str = formatcp!("{NAMESPACE}_consumer_groups_total");
-const M_CG_HELP: &str = "Consumer groups currently in the cluster";
-const M_CG_MEMBERS_NAME: &str = formatcp!("{NAMESPACE}_consumer_groups_members_total");
-const M_CG_MEMBERS_HELP: &str = "Members of consumer groups currently in the cluster";
-const M_CG_FETCH_NAME: &str =
-    formatcp!("{NAMESPACE}_consumer_groups_emitter_fetch_time_milliseconds");
-const M_CG_FETCH_HELP: &str =
-    "Time (in milliseconds) taken to fetch information about all consumer groups in cluster";
-const M_CG_CH_CAP_NAME: &str = formatcp!("{NAMESPACE}_consumer_groups_emitter_channel_capacity");
-const M_CG_CH_CAP_HELP: &str =
+const MET_TOT_NAME: &str = "consumer_groups_total";
+const MET_TOT_HELP: &str = "Consumer groups currently in the cluster";
+const MET_MEMBERS_TOT_NAME: &str = "consumer_groups_members_total";
+const MET_MEMBERS_TOT_HELP: &str = "Members of consumer groups currently in the cluster";
+const MET_FETCH_NAME: &str = "consumer_groups_emitter_fetch_time_milliseconds";
+const MET_FETCH_HELP: &str =
+    "Time (ms) taken to fetch information about all consumer groups in cluster";
+const MET_CH_CAP_NAME: &str = "consumer_groups_emitter_channel_capacity";
+const MET_CH_CAP_HELP: &str =
     "Capacity of internal channel used to send consumer groups metadata to rest of the service";
 
 /// A map of all the known Consumer Groups, at a given point in time.
@@ -115,10 +116,10 @@ pub struct ConsumerGroupsEmitter {
     admin_client_config: ClientConfig,
 
     // Prometheus Metrics
-    metric_cg: IntGauge,
-    metric_cg_members: IntGaugeVec,
-    metric_cg_fetch: Histogram,
-    metric_cg_ch_cap: IntGauge,
+    metric_tot: IntGauge,
+    metric_members_tot: IntGaugeVec,
+    metric_fetch: Histogram,
+    metric_ch_cap: IntGauge,
 }
 
 impl ConsumerGroupsEmitter {
@@ -128,38 +129,29 @@ impl ConsumerGroupsEmitter {
     ///
     /// * `admin_client_config` - Kafka admin client configuration, used to fetch Consumer Groups
     pub fn new(admin_client_config: ClientConfig, metrics: Arc<Registry>) -> Self {
-        // Create metrics
-        let metric_cg = IntGauge::new(M_CG_NAME, M_CG_HELP)
-            .unwrap_or_else(|_| panic!("Failed to create metric: {M_CG_NAME}"));
-        let metric_cg_members =
-            IntGaugeVec::new(Opts::new(M_CG_MEMBERS_NAME, M_CG_MEMBERS_HELP), &[LABEL_GROUP])
-                .unwrap_or_else(|_| panic!("Failed to create metric: {M_CG_MEMBERS_NAME}"));
-        let metric_cg_fetch =
-            Histogram::with_opts(HistogramOpts::new(M_CG_FETCH_NAME, M_CG_FETCH_HELP))
-                .unwrap_or_else(|_| panic!("Failed to create metric: {M_CG_FETCH_NAME}"));
-        let metric_cg_ch_cap = IntGauge::new(M_CG_CH_CAP_NAME, M_CG_CH_CAP_HELP)
-            .unwrap_or_else(|_| panic!("Failed to create metric: {M_CG_CH_CAP_NAME}"));
-
-        // Register metrics
-        metrics
-            .register(Box::new(metric_cg.clone()))
-            .unwrap_or_else(|_| panic!("Failed to register metric: {M_CG_NAME}"));
-        metrics
-            .register(Box::new(metric_cg_members.clone()))
-            .unwrap_or_else(|_| panic!("Failed to register metric: {M_CG_MEMBERS_NAME}"));
-        metrics
-            .register(Box::new(metric_cg_fetch.clone()))
-            .unwrap_or_else(|_| panic!("Failed to register metric: {M_CG_FETCH_NAME}"));
-        metrics
-            .register(Box::new(metric_cg_ch_cap.clone()))
-            .unwrap_or_else(|_| panic!("Failed to register metric: {M_CG_CH_CAP_NAME}"));
-
         Self {
             admin_client_config,
-            metric_cg,
-            metric_cg_members,
-            metric_cg_fetch,
-            metric_cg_ch_cap,
+            metric_tot: register_int_gauge_with_registry!(MET_TOT_NAME, MET_TOT_HELP, metrics)
+                .unwrap_or_else(|_| panic!("Failed to create metric: {MET_TOT_NAME}")),
+            metric_members_tot: register_int_gauge_vec_with_registry!(
+                MET_MEMBERS_TOT_NAME,
+                MET_MEMBERS_TOT_HELP,
+                &[LABEL_GROUP],
+                metrics
+            )
+            .unwrap_or_else(|_| panic!("Failed to create metric: {MET_MEMBERS_TOT_NAME}")),
+            metric_fetch: register_histogram_with_registry!(
+                MET_FETCH_NAME,
+                MET_FETCH_HELP,
+                metrics
+            )
+            .unwrap_or_else(|_| panic!("Failed to create metric: {MET_FETCH_NAME}")),
+            metric_ch_cap: register_int_gauge_with_registry!(
+                MET_CH_CAP_NAME,
+                MET_CH_CAP_HELP,
+                metrics
+            )
+            .unwrap_or_else(|_| panic!("Failed to create metric: {MET_CH_CAP_NAME}")),
         }
     }
 }
@@ -188,10 +180,10 @@ impl Emitter for ConsumerGroupsEmitter {
         let (sx, rx) = mpsc::channel::<Self::Emitted>(CHANNEL_SIZE);
 
         // Clone metrics so they can be used in the spawned future
-        let metric_cg = self.metric_cg.clone();
-        let metric_cg_members = self.metric_cg_members.clone();
-        let metric_cg_fetch = self.metric_cg_fetch.clone();
-        let metric_cg_ch_cap = self.metric_cg_ch_cap.clone();
+        let metric_cg = self.metric_tot.clone();
+        let metric_cg_members = self.metric_members_tot.clone();
+        let metric_cg_fetch = self.metric_fetch.clone();
+        let metric_cg_ch_cap = self.metric_ch_cap.clone();
 
         let join_handle = tokio::spawn(async move {
             let mut interval = interval(FETCH_INTERVAL);

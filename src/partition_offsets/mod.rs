@@ -12,6 +12,7 @@ pub use register::PartitionOffsetsRegister;
 pub use tracked_offset::TrackedOffset;
 
 // Imports
+use prometheus::Registry;
 use std::sync::Arc;
 
 use rdkafka::ClientConfig;
@@ -27,12 +28,17 @@ pub fn init(
     register_ready_at_pct: f64,
     cluster_status_register: Arc<ClusterStatusRegister>,
     shutdown_token: CancellationToken,
+    metrics: Arc<Registry>,
 ) -> (PartitionOffsetsRegister, JoinHandle<()>) {
     let (po_rx, poe_join) =
-        PartitionOffsetsEmitter::new(admin_client_config, cluster_status_register)
+        PartitionOffsetsEmitter::new(admin_client_config, cluster_status_register, metrics.clone())
             .spawn(shutdown_token);
-    let po_reg =
-        PartitionOffsetsRegister::new(po_rx, register_offsets_history, register_ready_at_pct);
+    let po_reg = PartitionOffsetsRegister::new(
+        po_rx,
+        register_offsets_history,
+        register_ready_at_pct,
+        metrics,
+    );
 
     debug!("Initialized");
     (po_reg, poe_join)
