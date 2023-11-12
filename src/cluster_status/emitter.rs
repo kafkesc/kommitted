@@ -7,7 +7,7 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::constants::KONSUMER_OFFSETS_DATA_TOPIC;
+use crate::constants::{DEFAULT_CLUSTER_ID, KONSUMER_OFFSETS_DATA_TOPIC};
 use crate::internals::Emitter;
 use crate::kafka_types::{Broker, TopicPartitionsStatus};
 
@@ -15,8 +15,6 @@ const CHANNEL_SIZE: usize = 5;
 
 const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 const FETCH_INTERVAL: Duration = Duration::from_secs(60);
-
-pub const CLUSTER_ID_NONE: &str = "__none__";
 
 /// This is a `Send`-able struct to carry Kafka Cluster status across thread boundaries.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
@@ -39,7 +37,7 @@ pub struct ClusterStatus {
 impl ClusterStatus {
     fn from(id: Option<String>, m: Metadata) -> Self {
         Self {
-            id: id.unwrap_or_else(|| CLUSTER_ID_NONE.to_string()),
+            id: id.unwrap_or_else(|| DEFAULT_CLUSTER_ID.to_string()),
             topics: m
                 .topics()
                 .iter()

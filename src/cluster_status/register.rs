@@ -5,6 +5,7 @@ use tokio::sync::{mpsc::Receiver, RwLock};
 
 use super::emitter::ClusterStatus;
 
+use crate::constants::DEFAULT_CLUSTER_ID;
 use crate::internals::Awaitable;
 use crate::kafka_types::{Broker, TopicPartition};
 
@@ -67,7 +68,7 @@ impl ClusterStatusRegister {
     /// Current identifier of the Kafka cluster.
     pub async fn get_cluster_id(&self) -> String {
         match &*(self.latest_status.read().await) {
-            None => super::emitter::CLUSTER_ID_NONE.to_string(),
+            None => DEFAULT_CLUSTER_ID.to_string(),
             Some(cs) => cs.id.clone(),
         }
     }

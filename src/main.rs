@@ -28,6 +28,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let admin_client_config = cli.build_client_config();
     let shutdown_token = build_shutdown_token();
 
+    // Init `prometheus_metrics` module
+    let prom_reg = prometheus_metrics::init(admin_client_config.clone(), cli.cluster_id.clone());
+    let prom_reg_arc = Arc::new(prom_reg);
+
     // Init `cluster_status` module, and await registry to be ready
     let (cs_reg, cs_join) = cluster_status::init(
         admin_client_config.clone(),
@@ -36,10 +40,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     );
     cs_reg.await_ready(shutdown_token.clone()).await?;
     let cs_reg_arc = Arc::new(cs_reg);
-
-    // Init `prometheus_metrics` module
-    let prom_reg = prometheus_metrics::init(cs_reg_arc.get_cluster_id().await);
-    let prom_reg_arc = Arc::new(prom_reg);
 
     // Init `partition_offsets` module, and await registry to be ready
     let (po_reg, po_join) = partition_offsets::init(
