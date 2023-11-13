@@ -30,10 +30,10 @@ exclude = [
 async-trait = "0.1.74"
 axum = { version = "0.6.20", features = ["http2"] }
 chrono = "0.4.31"
-clap = { version = "4.4.7", features = ["derive", "deprecated", "env", "wrap_help"] }
+clap = { version = "4.4.8", features = ["derive", "deprecated", "env", "wrap_help"] }
 const_format = "0.2.32"
 ctrlc = { version = "3.4.1", features = ["termination"] }
-env_logger = "0.10.0"
+env_logger = "0.10.1"
 exit-code = "1.0.0"
 hyper = { version = "0.14.27", features = ["http1", "http2", "server", "runtime", "tcp"] }
 konsumer_offsets = { version = "0.3.0", default-features = false, features = ["ts_chrono"] }
@@ -41,7 +41,7 @@ log = "0.4.20"
 prometheus = "0.13.3"
 regex = "1.10.2"
 thiserror = "1.0.50"
-tokio = { version = "1.33.0", features = ["rt", "rt-multi-thread", "time", "sync", "macros"] }
+tokio = { version = "1.34.0", features = ["rt", "rt-multi-thread", "time", "sync", "macros"] }
 tokio-util = "0.7.10"
 
 [target.'cfg(unix)'.dependencies]
