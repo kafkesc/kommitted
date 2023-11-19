@@ -37,6 +37,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         admin_client_config.clone(),
         cli.cluster_id.clone(),
         shutdown_token.clone(),
+        prom_reg_arc.clone(),
     );
     cs_reg.await_ready(shutdown_token.clone()).await?;
     let cs_reg_arc = Arc::new(cs_reg);
