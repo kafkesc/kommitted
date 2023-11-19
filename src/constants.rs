@@ -24,3 +24,6 @@ pub(crate) const DEFAULT_OFFSETS_HISTORY: &str = "3600"; //< `usize` after parsi
 ///
 /// See [`crate::Cli`]'s `offsets_history_ready_at`.
 pub(crate) const DEFAULT_OFFSETS_HISTORY_READY_AT: &str = "0.3"; //< `f64` after parsing
+
+/// The default `cluster_id` value, if none is provided (either via CLI override, nor Cluster configuration).
+pub(crate) const DEFAULT_CLUSTER_ID: &str = "__not-set__";

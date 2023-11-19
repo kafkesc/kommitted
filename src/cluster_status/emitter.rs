@@ -1,4 +1,10 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
+use prometheus::{
+    register_histogram_with_registry, register_int_gauge_with_registry, Histogram, IntGauge,
+    Registry,
+};
 use rdkafka::{admin::AdminClient, client::DefaultClientContext, metadata::Metadata, ClientConfig};
 use tokio::{
     sync::mpsc,
@@ -7,7 +13,7 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::constants::KONSUMER_OFFSETS_DATA_TOPIC;
+use crate::constants::{DEFAULT_CLUSTER_ID, KONSUMER_OFFSETS_DATA_TOPIC};
 use crate::internals::Emitter;
 use crate::kafka_types::{Broker, TopicPartitionsStatus};
 
@@ -16,7 +22,11 @@ const CHANNEL_SIZE: usize = 5;
 const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 const FETCH_INTERVAL: Duration = Duration::from_secs(60);
 
-pub const CLUSTER_ID_NONE: &str = "__none__";
+const MET_FETCH_NAME: &str = "cluster_status_emitter_fetch_time_milliseconds";
+const MET_FETCH_HELP: &str = "Time (ms) taken to fetch cluster status metadata";
+const MET_CH_CAP_NAME: &str = "cluster_status_emitter_channel_capacity";
+const MET_CH_CAP_HELP: &str =
+    "Capacity of internal channel used to send cluster status metadata to rest of the service";
 
 /// This is a `Send`-able struct to carry Kafka Cluster status across thread boundaries.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
@@ -39,7 +49,7 @@ pub struct ClusterStatus {
 impl ClusterStatus {
     fn from(id: Option<String>, m: Metadata) -> Self {
         Self {
-            id: id.unwrap_or_else(|| CLUSTER_ID_NONE.to_string()),
+            id: id.unwrap_or_else(|| DEFAULT_CLUSTER_ID.to_string()),
             topics: m
                 .topics()
                 .iter()
@@ -60,6 +70,10 @@ impl ClusterStatus {
 /// It shuts down when the provided [`CancellationToken`] is cancelled.
 pub struct ClusterStatusEmitter {
     admin_client_config: ClientConfig,
+
+    // Prometheus Metrics
+    metric_fetch: Histogram,
+    metric_ch_cap: IntGauge,
 }
 
 impl ClusterStatusEmitter {
@@ -68,9 +82,21 @@ impl ClusterStatusEmitter {
     /// # Arguments
     ///
     /// * `client_config` - Kafka admin client configuration, used to fetch the Cluster current status
-    pub fn new(client_config: ClientConfig) -> Self {
+    pub fn new(client_config: ClientConfig, metrics: Arc<Registry>) -> Self {
         Self {
             admin_client_config: client_config,
+            metric_fetch: register_histogram_with_registry!(
+                MET_FETCH_NAME,
+                MET_FETCH_HELP,
+                metrics
+            )
+            .unwrap_or_else(|_| panic!("Failed to create metric: {MET_FETCH_NAME}")),
+            metric_ch_cap: register_int_gauge_with_registry!(
+                MET_CH_CAP_NAME,
+                MET_CH_CAP_HELP,
+                metrics
+            )
+            .unwrap_or_else(|_| panic!("Failed to create metric: {MET_CH_CAP_NAME}")),
         }
     }
 }
@@ -98,14 +124,27 @@ impl Emitter for ClusterStatusEmitter {
 
         let (sx, rx) = mpsc::channel::<Self::Emitted>(CHANNEL_SIZE);
 
+        // Clone metrics so they can be used in the spawned future
+        let metric_fetch = self.metric_fetch.clone();
+        let metric_ch_cap = self.metric_ch_cap.clone();
+
         let join_handle = tokio::spawn(async move {
             let mut interval = interval(FETCH_INTERVAL);
 
             loop {
-                match admin_client.inner().fetch_metadata(None, FETCH_TIMEOUT).map(|m| {
-                    Self::Emitted::from(admin_client.inner().fetch_cluster_id(FETCH_TIMEOUT), m)
-                }) {
+                // Fetch metadata and update timer metric
+                let timer = metric_fetch.start_timer();
+                let res_status =
+                    admin_client.inner().fetch_metadata(None, FETCH_TIMEOUT).map(|m| {
+                        Self::Emitted::from(admin_client.inner().fetch_cluster_id(FETCH_TIMEOUT), m)
+                    });
+                timer.observe_duration();
+
+                match res_status {
                     Ok(status) => {
+                        // Update channel capacity metric
+                        metric_ch_cap.set(sx.capacity() as i64);
+
                         tokio::select! {
                             res = Self::emit_with_interval(&sx, status, &mut interval) => {
                                 if let Err(e) = res {

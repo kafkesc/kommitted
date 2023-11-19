@@ -96,7 +96,7 @@ to produce the lag information for).
 <dl>
   <dt><code>kmtd_consumer_groups_total</code></dt>
   <dd>
-    <b>Description:</b> <i>"Consumer groups currently in the cluster.</i><br/>
+    <b>Description:</b> <i>Consumer groups currently in the cluster.</i><br/>
     <b>Labels:</b> <code>cluster_id</code><br/>
     <b>Type:</b> <code>gauge</code><br/>
     <b>Timestamped:</b> <code>false</code>
@@ -113,7 +113,71 @@ to produce the lag information for).
   </dd>
 </dl>
 
+<dl>
+  <dt><code>kmtd_cluster_brokers_total</code></dt>
+  <dd>
+    <b>Description:</b> <i>Brokers currently in cluster.</i><br/>
+    <b>Labels:</b> <code>cluster_id</code><br/>
+    <b>Type:</b> <code>gauge</code><br/>
+    <b>Timestamped:</b> <code>false</code>
+  </dd>
+</dl>
+
+<dl>
+  <dt><code>kmtd_cluster_topics_total</code></dt>
+  <dd>
+    <b>Description:</b> <i>Topics currently in cluster.</i><br/>
+    <b>Labels:</b> <code>cluster_id</code><br/>
+    <b>Type:</b> <code>gauge</code><br/>
+    <b>Timestamped:</b> <code>false</code>
+  </dd>
+</dl>
+
+<dl>
+  <dt><code>kmtd_cluster_partitions_total</code></dt>
+  <dd>
+    <b>Description:</b> <i>Partitions currently in cluster.</i><br/>
+    <b>Labels:</b> <code>cluster_id</code><br/>
+    <b>Type:</b> <code>gauge</code><br/>
+    <b>Timestamped:</b> <code>false</code>
+  </dd>
+</dl>
+
+<dl>
+  <dt><code>kmtd_cluster_topic_partitions_total</code></dt>
+  <dd>
+    <b>Description:</b> <i>Topic's Partitions currently in cluster.</i><br/>
+    <b>Labels:</b> <code>cluster_id, topic</code><br/>
+    <b>Type:</b> <code>gauge</code><br/>
+    <b>Timestamped:</b> <code>false</code>
+  </dd>
+</dl>
+
 ### Kommitted (internal) Metrics
+
+#### `cluster_status` module
+
+<dl>
+  <dt><code>kmtd_cluster_status_emitter_fetch_time_milliseconds</code></dt>
+  <dd>
+    <b>Description:</b> <i>Time (ms) taken to fetch cluster status metadata.</i><br/>
+    <b>Labels:</b> <code>cluster_id</code><br/>
+    <b>Type:</b> <code>histogram</code><br/>
+    <b>Timestamped:</b> <code>false</code>
+  </dd>
+</dl>
+
+<dl>
+  <dt><code>kmtd_cluster_status_emitter_channel_capacity</code></dt>
+  <dd>
+    <b>Description:</b> <i>Capacity of internal channel used to send cluster status metadata to rest of the service.</i><br/>
+    <b>Labels:</b> <code>cluster_id</code><br/>
+    <b>Type:</b> <code>gauge</code><br/>
+    <b>Timestamped:</b> <code>false</code>
+  </dd>
+</dl>
+
+#### `consumer_groups` module
 
 <dl>
   <dt><code>kmtd_consumer_groups_emitter_fetch_time_milliseconds</code></dt>
@@ -134,6 +198,8 @@ to produce the lag information for).
     <b>Timestamped:</b> <code>false</code>
   </dd>
 </dl>
+
+#### `partition_offsets` module
 
 <dl>
   <dt><code>kmtd_partition_offsets_emitter_fetch_time_milliseconds</code></dt>

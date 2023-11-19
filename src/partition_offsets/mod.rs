@@ -7,9 +7,7 @@ mod tracked_offset;
 
 // Exports
 pub use emitter::PartitionOffsetsEmitter;
-pub use errors::PartitionOffsetsError;
 pub use register::PartitionOffsetsRegister;
-pub use tracked_offset::TrackedOffset;
 
 // Imports
 use prometheus::Registry;

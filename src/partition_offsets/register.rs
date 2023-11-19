@@ -108,7 +108,7 @@ impl PartitionOffsetsRegister {
                             .await
                             .update(po.earliest_offset, po.latest_offset, po.read_datetime);
 
-                        // Update metric
+                        // Update usage metrics
                         metric_usage
                             .with_label_values(&[&k.topic, &k.partition.to_string()])
                             .set(estimator_rwlock.read().await.usage() as i64);
