@@ -23,8 +23,9 @@ pub fn init(
     metrics: Arc<Registry>,
 ) -> (ClusterStatusRegister, JoinHandle<()>) {
     // Cluster Status: emitter and register
-    let (cs_rx, cse_join) = ClusterStatusEmitter::new(admin_client_config).spawn(shutdown_token);
     let cs_reg = ClusterStatusRegister::new(cluster_id_override, cs_rx);
+    let (cs_rx, cse_join) =
+        ClusterStatusEmitter::new(admin_client_config, metrics.clone()).spawn(shutdown_token);
 
     debug!("Initialized");
     (cs_reg, cse_join)
