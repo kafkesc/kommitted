@@ -189,16 +189,15 @@ impl Emitter for ConsumerGroupsEmitter {
             let mut interval = interval(FETCH_INTERVAL);
 
             loop {
+                // Fetch Consumer Groups and update timer metrics
                 let timer = metric_cg_fetch.start_timer();
-                let res_groups = admin_client
+                let res_cg = admin_client
                     .inner()
                     .fetch_group_list(None, FETCH_TIMEOUT)
                     .map(Self::Emitted::from);
-
-                // Update fetching time metric
                 timer.observe_duration();
 
-                match res_groups {
+                match res_cg {
                     Ok(cg) => {
                         // Update group and group member metrics
                         metric_cg.set(cg.groups.len() as i64);

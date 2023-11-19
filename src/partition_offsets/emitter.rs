@@ -23,10 +23,10 @@ const CHANNEL_SIZE: usize = 10_000;
 const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 const FETCH_INTERVAL: Duration = Duration::from_millis(10);
 
-const MET_FETCH_NAME: &str = "_partition_offsets_emitter_fetch_time_milliseconds";
+const MET_FETCH_NAME: &str = "partition_offsets_emitter_fetch_time_milliseconds";
 const MET_FETCH_HELP: &str =
     "Time (ms) taken to fetch earliest/latest (watermark) offsets of a specific topic partition in cluster";
-const MET_CH_CAP_NAME: &str = "_partition_offsets_emitter_channel_capacity";
+const MET_CH_CAP_NAME: &str = "partition_offsets_emitter_channel_capacity";
 const MET_CH_CAP_HELP: &str =
     "Capacity of internal channel used to send partition watermark offsets to rest of the service";
 
@@ -128,14 +128,15 @@ impl Emitter for PartitionOffsetsEmitter {
                     trace!("Fetching earliest/latest offset for Partitions of Topic '{}'", t);
 
                     for p in csr.get_partitions_for_topic(&t).await.unwrap_or_default() {
+                        // Fetch Partition Watermarks and update timer metrics
                         let timer =
                             metric_cg_fetch.with_label_values(&[&t, &p.to_string()]).start_timer();
+                        let res_watermarks =
+                            admin_client.inner().fetch_watermarks(&t, p as i32, FETCH_TIMEOUT);
+                        timer.observe_duration();
 
-                        match admin_client.inner().fetch_watermarks(&t, p as i32, FETCH_TIMEOUT) {
+                        match res_watermarks {
                             Ok((earliest, latest)) => {
-                                // Update fetching time metric for (topic,partition) tuple
-                                timer.observe_duration();
-
                                 let po = PartitionOffset {
                                     topic: t.clone(),
                                     partition: p,
