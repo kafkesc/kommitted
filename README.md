@@ -27,8 +27,8 @@ Please see [DESIGN.md](./DESIGN.md) for details about the overall architecture, 
 * [x] Track Offset Lag for all consumers
 * [x] Track Time Lag for all consumers
 * [x] Offset and Lag metrics are tracked with all contextual information to identify exact topic partition assignments
-* [ ] Exposes additional metrics to track status of Kafka cluster (topics, members, brokers, partitions)
-* [ ] Exposes Kafka-polling metrics, to assess its own performance
+* [x] Exposes additional metrics to track status of Kafka cluster (topics, members, brokers, partitions)
+* [x] Exposes Kafka-polling metrics, to assess its own performance
 * [x] Metrics exposed in [Prometheus format](https://prometheus.io/docs/instrumenting/exposition_formats/#exposition-formats), at `/metrics` endpoint
 * [ ] REST API to build further automation on top of it (e.g. auto-scaling logics that depend on Consumer Group lag)
 
@@ -61,7 +61,7 @@ Kommitted supports _compact_ (`-h`) and _extended_ (`--help`) usage instructions
 Use the former for a quick look up; use the latter to better understand what
 each argument can do.
 
-<details open>
+<details>
   <summary>Compact: `kommitted -h`</summary>
 
   ```shell
