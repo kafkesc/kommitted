@@ -1,8 +1,19 @@
-# vNEXT (????-??-??)
+# v0.2.2 (2023-11-19)
+
+## Features
+
+* Exposed `consumer_groups` module metrics ([I#53](https://github.com/kafkesc/kommitted/issues/53), [I#55](https://github.com/kafkesc/kommitted/issues/55))
+* Exposed `partition_offsets` module metrics ([I#57](https://github.com/kafkesc/kommitted/issues/57))
+* Exposed `cluster_status` module metrics ([I#54](https://github.com/kafkesc/kommitted/issues/54), [I#56](https://github.com/kafkesc/kommitted/issues/56))
 
 ## Enhancements
 
 * Reworked workflows that publish Docker image: triggering 1 dedicated workflow per target ([I#80](https://github.com/kafkesc/kommitted/issues/80))
+
+## Notes
+
+* Multiple rounds of dependencies upgrade
+* Updated [`METRICS.md`](./METRICS.md) with documentation for each of the added metrics
 
 # v0.2.1 (2023-10-04)
 
