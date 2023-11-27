@@ -37,6 +37,7 @@ pub async fn init(
     shutdown_token: CancellationToken,
     metrics: Arc<Registry>,
 ) {
+    // Assemble the HTTP Service State object, that will be passed to the routes
     let state = HttpServiceState {
         cs_reg,
         po_reg,
@@ -44,13 +45,14 @@ pub async fn init(
         metrics,
     };
 
-    // build our application with a route
+    // Setup Router
     let app = Router::new()
         // `GET /` goes to `root`
         .route("/", get(root))
         .route("/metrics", get(prometheus_metrics))
         .with_state(state);
 
+    // Setup Server, with Graceful Shutdown
     let server = axum::Server::bind(&listen_on)
         .serve(app.into_make_service())
         .with_graceful_shutdown(shutdown_token.cancelled());
