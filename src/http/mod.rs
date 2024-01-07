@@ -217,8 +217,8 @@ async fn prometheus_metrics(State(state): State<HttpServiceState>) -> impl IntoR
     // TODO https://github.com/kafkesc/kommitted/issues/56
     // TODO https://github.com/kafkesc/kommitted/issues/57
 
-    // Turn the bespoke metrics created so far, into a String
-    let mut body = body.join("\n");
+    // Turn the bespoke metrics created so far, into a single String
+    let mut body = body.join("\n") + "\n";
 
     // Append to the bespoke metrics, classic Prometheus Metrics
     let metrics_family = state.metrics.gather();
