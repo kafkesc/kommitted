@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use axum::{
     extract::State,
@@ -8,7 +8,9 @@ use axum::{
     Router,
 };
 use prometheus::{Registry, TextEncoder};
+use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
+use tower_http::timeout::TimeoutLayer;
 
 use crate::cluster_status::ClusterStatusRegister;
 use crate::lag_register::LagRegister;
@@ -20,6 +22,8 @@ use crate::prometheus_metrics::bespoke::*;
 // TODO https://github.com/kafkesc/kommitted/issues/50
 // TODO https://github.com/kafkesc/kommitted/issues/51
 // TODO https://github.com/kafkesc/kommitted/issues/49
+
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Clone)]
 struct HttpServiceState {
@@ -50,17 +54,20 @@ pub async fn init(
         // `GET /` goes to `root`
         .route("/", get(root))
         .route("/metrics", get(prometheus_metrics))
+        // In addition to handling shutdown gracefully (see below),
+        // enforce a request timeout just to avoid requests hanging forever.
+        .layer(TimeoutLayer::new(REQUEST_TIMEOUT))
         .with_state(state);
 
-    // Setup Server, with Graceful Shutdown
-    let server = axum::Server::bind(&listen_on)
-        .serve(app.into_make_service())
-        .with_graceful_shutdown(shutdown_token.cancelled());
-
+    // Setup Connections Listener
     info!("Begin listening on '{}'...", listen_on);
-    server
+    let listener = TcpListener::bind(listen_on).await.expect("Failed to bind to address (fatal)");
+
+    // Setup Server
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_token.cancelled_owned())
         .await
-        .expect("HTTP Graceful Shutdown handler returned an error - this should never happen");
+        .expect("Failed to start Server (fatal)");
 }
 
 async fn root() -> &'static str {

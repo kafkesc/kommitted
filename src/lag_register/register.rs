@@ -168,7 +168,7 @@ async fn process_consumer_groups(
         } else {
             let gwl = w_guard.get_mut(&group_name).unwrap_or_else(|| {
                 panic!(
-                    "{} for {:#?} could not be found: this should never happen!",
+                    "{} for {:#?} could not be found (fatal)",
                     std::any::type_name::<GroupWithLag>(),
                     group_name
                 )

@@ -100,7 +100,7 @@ impl PartitionOffsetsRegister {
                         // Get exclusive write lock on the specific partition esimator
                         let estimator_rwlock = r_guard
                             .get(&k)
-                            .unwrap_or_else(|| panic!("{} for {:#?} could not be found: this should never happen!", std::any::type_name::<PartitionLagEstimator>(), k));
+                            .unwrap_or_else(|| panic!("{} for {:#?} could not be found (fatal)", std::any::type_name::<PartitionLagEstimator>(), k));
 
                         // Update the PartitionLagEstimator
                         estimator_rwlock
