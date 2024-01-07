@@ -57,7 +57,7 @@ impl KonsumerOffsetsDataEmitter {
     ) -> KafkaResult<()> {
         // Fetch topic metadata
         let meta = consumer.fetch_metadata(Some(topic), Duration::from_secs(5))?;
-        let topic_meta = meta.topics().get(0).ok_or(KafkaError::Subscription(format!(
+        let topic_meta = meta.topics().first().ok_or(KafkaError::Subscription(format!(
             "Unable to (self)assign '{}' and seek to earliest offsets",
             topic
         )))?;
