@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use tokio::{sync::mpsc, task::JoinHandle, time::Interval};
 use tokio_util::sync::CancellationToken;
 
@@ -8,7 +7,6 @@ use tokio_util::sync::CancellationToken;
 /// It terminates itself when [`CancellationToken`] is cancelled (elsewhere).
 ///
 /// Awaiting for its termination should be done via the returned [`JoinHandle`].
-#[async_trait]
 pub trait Emitter {
     type Emitted: Send;
 

@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use konsumer_offsets::KonsumerOffsetsData;
 use rdkafka::error::KafkaError;
 use rdkafka::{
@@ -125,7 +124,6 @@ impl ConsumerContext for KonsumerOffsetsDataContext {
 
 type KonsumerOffsetsDataConsumer = StreamConsumer<KonsumerOffsetsDataContext>;
 
-#[async_trait]
 impl Emitter for KonsumerOffsetsDataEmitter {
     type Emitted = KonsumerOffsetsData;
 

@@ -3,7 +3,6 @@ use std::{
     sync::Arc,
 };
 
-use async_trait::async_trait;
 use konsumer_offsets::ConsumerProtocolAssignment;
 use prometheus::{
     register_histogram_with_registry, register_int_gauge_vec_with_registry,
@@ -156,7 +155,6 @@ impl ConsumerGroupsEmitter {
     }
 }
 
-#[async_trait]
 impl Emitter for ConsumerGroupsEmitter {
     type Emitted = ConsumerGroups;
 

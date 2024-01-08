@@ -1,6 +1,5 @@
 use std::{collections::HashMap, sync::Arc};
 
-use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use prometheus::{register_int_gauge_vec_with_registry, IntGaugeVec, Registry};
 use tokio::sync::{mpsc::Receiver, RwLock};
@@ -300,7 +299,6 @@ impl PartitionOffsetsRegister {
     }
 }
 
-#[async_trait]
 impl Awaitable for PartitionOffsetsRegister {
     async fn is_ready(&self) -> bool {
         let (min, max, avg, count) = self.get_usage().await;

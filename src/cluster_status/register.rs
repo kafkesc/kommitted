@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use prometheus::{
     register_int_gauge_vec_with_registry, register_int_gauge_with_registry, IntGauge, IntGaugeVec,
     Registry,
@@ -193,7 +192,6 @@ impl ClusterStatusRegister {
     }
 }
 
-#[async_trait]
 impl Awaitable for ClusterStatusRegister {
     /// [`Self`] ready when its internal copy of [`ClusterStatus`] has been populated.
     async fn is_ready(&self) -> bool {

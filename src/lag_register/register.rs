@@ -3,7 +3,6 @@ use std::{
     sync::Arc,
 };
 
-use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use konsumer_offsets::{GroupMetadata, KonsumerOffsetsData, OffsetCommit};
 use log::Level::Trace;
@@ -216,29 +215,25 @@ async fn process_offset_commit(
             let l = Lag {
                 offset: oc.offset as u64,
                 offset_timestamp: oc.commit_timestamp,
-                offset_lag: match po_reg.estimate_offset_lag(&tp, oc.offset as u64).await {
-                    Ok(ol) => ol,
-                    Err(e) => {
-                        debug!(
+                offset_lag: po_reg.estimate_offset_lag(&tp, oc.offset as u64)
+                    .await
+                    .unwrap_or_else(|e| {
+                    debug!(
                             "Failed to estimate Offset Lag of Group '{}' for Topic Partition '{}': {}",
                             oc.group, tp, e
                         );
-                        0
-                    },
-                },
-                time_lag: match po_reg
+                    0
+                }),
+                time_lag: po_reg
                     .estimate_time_lag(&tp, oc.offset as u64, oc.commit_timestamp)
                     .await
-                {
-                    Ok(tl) => tl,
-                    Err(e) => {
-                        debug!(
+                    .unwrap_or_else(|e| {
+                    debug!(
                             "Failed to estimate Time Lag of Group '{}' for Topic Partition '{}': {}",
                             oc.group, tp, e
                         );
-                        Duration::zero()
-                    },
-                },
+                    Duration::zero()
+                }),
             };
 
             // Create or update entry `TopicPartition -> LagWithOwner`:
@@ -334,7 +329,6 @@ async fn process_group_metadata(
     }
 }
 
-#[async_trait]
 impl Awaitable for LagRegister {
     async fn is_ready(&self) -> bool {
         // TODO https://github.com/kafkesc/kommitted/issues/59

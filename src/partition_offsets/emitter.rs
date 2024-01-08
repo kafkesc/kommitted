@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use prometheus::{
     register_histogram_vec_with_registry, register_int_gauge_with_registry, HistogramVec, IntGauge,
@@ -92,7 +91,6 @@ impl PartitionOffsetsEmitter {
     }
 }
 
-#[async_trait]
 impl Emitter for PartitionOffsetsEmitter {
     type Emitted = PartitionOffset;
 
