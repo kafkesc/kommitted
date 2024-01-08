@@ -1,3 +1,10 @@
+# vNEXT
+
+## Notes
+
+* Updated [`axum`](https://crates.io/crates/axum) (a key dependency) to `v0.7` ([PR#113](https://github.com/kafkesc/kommitted/pull/113))
+* Removed dependency on [`async-trait`](https://crates.io/crates/async-trait) (as per [Rust 1.75](https://blog.rust-lang.org/2023/12/21/async-fn-rpit-in-traits.html#where-the-gaps-lie)) ([PR#115](https://github.com/kafkesc/kommitted/pull/115))
+
 # v0.2.2 (2023-11-19)
 
 ## Features
