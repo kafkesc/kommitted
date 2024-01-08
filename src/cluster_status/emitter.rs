@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use prometheus::{
     register_histogram_with_registry, register_int_gauge_with_registry, Histogram, IntGauge,
     Registry,
@@ -101,7 +100,6 @@ impl ClusterStatusEmitter {
     }
 }
 
-#[async_trait]
 impl Emitter for ClusterStatusEmitter {
     type Emitted = ClusterStatus;
 

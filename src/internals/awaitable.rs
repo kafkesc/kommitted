@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use thiserror::Error;
 use tokio::{time::interval, time::Duration};
 use tokio_util::sync::CancellationToken;
@@ -10,7 +9,7 @@ const READYNESS_CHECK_INTERVAL: Duration = Duration::from_secs(1);
 /// An [`Self`] is ready once [`Self::is_ready`] returns `true`.
 /// The trait is built on _async/await_. The waiting is done by calling [`Self::await_ready`]:
 /// a [`CancellationToken`] is provided in case the _awaiting loop_ has to be interrupted.
-#[async_trait]
+
 pub trait Awaitable {
     /// Returns `true` if [`Self`] is ready, `false` otherwise.
     ///
