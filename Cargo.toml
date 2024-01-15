@@ -27,9 +27,9 @@ exclude = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum = { version = "0.7.3", features = ["http2"] }
+axum = { version = "0.7.4", features = ["http2"] }
 chrono = "0.4.31"
-clap = { version = "4.4.13", features = ["derive", "deprecated", "env", "wrap_help"] }
+clap = { version = "4.4.16", features = ["derive", "deprecated", "env", "wrap_help"] }
 const_format = "0.2.32"
 ctrlc = { version = "3.4.2", features = ["termination"] }
 env_logger = "0.10.1"
@@ -45,7 +45,7 @@ tokio-util = "0.7.10"
 tower-http = { version = "0.5", features = ["timeout"] }
 
 [target.'cfg(unix)'.dependencies]
-rdkafka = { version = "0.36.0", features = ["ssl-vendored", "gssapi-vendored", "libz-static"] }
+rdkafka = { version = "0.36.1", features = ["ssl-vendored", "gssapi-vendored", "libz-static"] }
 
 [profile.release]
 strip = true # Automatically strip symbols from the binary.
