@@ -9,7 +9,7 @@ use log::Level::Trace;
 use tokio::sync::{mpsc, RwLock};
 
 use crate::constants::KOMMITTED_CONSUMER_OFFSETS_CONSUMER;
-use crate::consumer_groups::ConsumerGroups;
+use crate::consumer_groups::ConsumerGroupsRegister;
 use crate::internals::Awaitable;
 use crate::kafka_types::{Group, Member, TopicPartition};
 use crate::partition_offsets::PartitionOffsetsRegister;
@@ -65,8 +65,8 @@ pub struct LagRegister {
 
 impl LagRegister {
     pub fn new(
-        mut cg_rx: mpsc::Receiver<ConsumerGroups>,
         mut kod_rx: mpsc::Receiver<KonsumerOffsetsData>,
+        cg_reg: Arc<ConsumerGroupsRegister>,
         po_reg: Arc<PartitionOffsetsRegister>,
     ) -> Self {
         let lr = LagRegister {
@@ -76,12 +76,22 @@ impl LagRegister {
         let lag_by_group_clone = lr.lag_by_group.clone();
 
         tokio::spawn(async move {
+            let cg_reg_curr_hash = 0u64;
+
             loop {
+                // Only update internal Map of Groups if the ConsumerGroupsRegister has changed
+                let cg_reg_latest_hash = cg_reg.get_hash().await;
+                if cg_reg_curr_hash != cg_reg_latest_hash {
+                    trace!(
+                        "Processing updated {} (hash {} != {})",
+                        std::any::type_name::<ConsumerGroupsRegister>(),
+                        cg_reg_curr_hash,
+                        cg_reg_latest_hash
+                    );
+                    process_consumer_groups(cg_reg.clone(), lag_by_group_clone.clone()).await;
+                }
+
                 tokio::select! {
-                    Some(cg) = cg_rx.recv() => {
-                        trace!("Processing {} reporting {} Groups", std::any::type_name::<ConsumerGroups>(), cg.groups.len());
-                        process_consumer_groups(cg, lag_by_group_clone.clone()).await;
-                    },
                     Some(kod) = kod_rx.recv() => {
                         match kod {
                             KonsumerOffsetsData::OffsetCommit(oc) => {
@@ -123,75 +133,74 @@ impl LagRegister {
 }
 
 async fn process_consumer_groups(
-    cg: ConsumerGroups,
+    cg_reg: Arc<ConsumerGroupsRegister>,
     lag_register_groups: Arc<RwLock<HashMap<String, GroupWithLag>>>,
 ) {
-    for (group_name, group_with_members) in cg.groups.into_iter() {
-        // Ignore own consumer of `__consumer_offsets` topic.
-        if group_name == KOMMITTED_CONSUMER_OFFSETS_CONSUMER {
-            continue;
-        }
+    for group_name in cg_reg.get_groups().await {
+        if let Some(group_with_members) = cg_reg.get_group(&group_name).await {
+            let mut w_guard = lag_register_groups.write().await;
 
-        let mut w_guard = lag_register_groups.write().await;
+            // Organise all the Group Members by the TopicPartition they own
+            let members_by_topic_partition = group_with_members
+                .members
+                .into_iter()
+                .flat_map(|(_, mwa)| {
+                    mwa.assignment.into_iter().map(|tp| (tp, mwa.member.clone())).collect::<HashMap<
+                        TopicPartition,
+                        Member,
+                    >>(
+                    )
+                })
+                .collect::<HashMap<TopicPartition, Member>>();
 
-        // Organise all the Group Members by the TopicPartition they own
-        let members_by_topic_partition = group_with_members
-            .members
-            .into_iter()
-            .flat_map(|(_, mwa)| {
-                mwa.assignment
-                    .into_iter()
-                    .map(|tp| (tp, mwa.member.clone()))
-                    .collect::<HashMap<TopicPartition, Member>>()
-            })
-            .collect::<HashMap<TopicPartition, Member>>();
+            // Insert or update "group name -> group with lag" map entries
+            if let Entry::Vacant(e) = w_guard.entry(group_name.clone()) {
+                e.insert(GroupWithLag {
+                    group: group_with_members.group,
+                    // Given this is a new Group,
+                    lag_by_topic_partition: members_by_topic_partition
+                        .into_iter()
+                        .map(|(tp, m)| {
+                            (
+                                tp,
+                                LagWithOwner {
+                                    owner: Some(m),
+                                    ..Default::default()
+                                },
+                            )
+                        })
+                        .collect(),
+                });
+            } else {
+                let gwl = w_guard.get_mut(&group_name).unwrap_or_else(|| {
+                    panic!(
+                        "{} for {:#?} could not be found (fatal)",
+                        std::any::type_name::<GroupWithLag>(),
+                        group_name
+                    )
+                });
 
-        // Insert or update "group name -> group with lag" map entries
-        if let Entry::Vacant(e) = w_guard.entry(group_name.clone()) {
-            e.insert(GroupWithLag {
-                group: group_with_members.group,
-                // Given this is a new Group,
-                lag_by_topic_partition: members_by_topic_partition
-                    .into_iter()
-                    .map(|(tp, m)| {
-                        (
-                            tp,
-                            LagWithOwner {
-                                owner: Some(m),
-                                ..Default::default()
-                            },
-                        )
-                    })
-                    .collect(),
-            });
-        } else {
-            let gwl = w_guard.get_mut(&group_name).unwrap_or_else(|| {
-                panic!(
-                    "{} for {:#?} could not be found (fatal)",
-                    std::any::type_name::<GroupWithLag>(),
-                    group_name
-                )
-            });
+                // Set the Group (probably unchanged)
+                gwl.group = group_with_members.group;
 
-            // Set the Group (probably unchanged)
-            gwl.group = group_with_members.group;
-
-            // Remove from map of LagWithOwner the entries with key TopicPartition not owner by any member of this group
-            gwl.lag_by_topic_partition.retain(|tp, _| members_by_topic_partition.contains_key(tp));
-
-            // Create or Update a entries `TopicPartition -> LagWithOwner`:
-            // either update the owner Member of an existing one,
-            // or create a new entry with no Lag set.
-            for (tp, m) in members_by_topic_partition.into_iter() {
+                // Remove from map of LagWithOwner the entries with key TopicPartition not owner by any member of this group
                 gwl.lag_by_topic_partition
-                    .entry(tp)
-                    .and_modify(|lwo| lwo.owner = Some(m.clone()))
-                    .or_insert_with(|| LagWithOwner {
-                        owner: Some(m),
-                        ..Default::default()
-                    });
-            }
-        };
+                    .retain(|tp, _| members_by_topic_partition.contains_key(tp));
+
+                // Create or Update an entries `TopicPartition -> LagWithOwner`:
+                // either update the owner Member of an existing one,
+                // or create a new entry with no Lag set.
+                for (tp, m) in members_by_topic_partition.into_iter() {
+                    gwl.lag_by_topic_partition
+                        .entry(tp)
+                        .and_modify(|lwo| lwo.owner = Some(m.clone()))
+                        .or_insert_with(|| LagWithOwner {
+                            owner: Some(m),
+                            ..Default::default()
+                        });
+                }
+            };
+        }
     }
 }
 
@@ -200,13 +209,7 @@ async fn process_offset_commit(
     lag_register_groups: Arc<RwLock<HashMap<String, GroupWithLag>>>,
     po_reg: Arc<PartitionOffsetsRegister>,
 ) {
-    // Ignore own consumer of `__consumer_offsets` topic.
-    if oc.group == KOMMITTED_CONSUMER_OFFSETS_CONSUMER {
-        return;
-    }
-
     let mut w_guard = lag_register_groups.write().await;
-
     match w_guard.get_mut(&oc.group) {
         Some(gwl) => {
             let tp = TopicPartition::new(oc.topic, oc.partition as u32);
@@ -247,13 +250,14 @@ async fn process_offset_commit(
                     owner: None,
                 });
         },
-        None => {
+        None if oc.group != KOMMITTED_CONSUMER_OFFSETS_CONSUMER => {
             warn!(
                 "Received {} about unknown Group '{}': ignoring",
                 std::any::type_name::<OffsetCommit>(),
                 oc.group
             );
         },
+        None => (),
     }
 }
 
@@ -261,13 +265,7 @@ async fn process_group_metadata(
     gm: GroupMetadata,
     lag_register_groups: Arc<RwLock<HashMap<String, GroupWithLag>>>,
 ) {
-    // Ignore own consumer of `__consumer_offsets` topic.
-    if gm.group == KOMMITTED_CONSUMER_OFFSETS_CONSUMER {
-        return;
-    }
-
     let mut w_guard = lag_register_groups.write().await;
-
     match w_guard.get_mut(&gm.group) {
         Some(gwl) => {
             // New map of Topic Partition->Member (owner), that the Group is consuming
@@ -319,19 +317,20 @@ async fn process_group_metadata(
                 }
             }
         },
-        None => {
+        None if gm.group != KOMMITTED_CONSUMER_OFFSETS_CONSUMER => {
             warn!(
                 "Received {} about unknown Group '{}': ignoring",
                 std::any::type_name::<GroupMetadata>(),
                 gm.group
             );
         },
+        None => (),
     }
 }
 
 impl Awaitable for LagRegister {
     async fn is_ready(&self) -> bool {
         // TODO https://github.com/kafkesc/kommitted/issues/59
-        self.lag_by_group.read().await.len() > 0
+        !self.lag_by_group.read().await.is_empty()
     }
 }
