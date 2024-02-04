@@ -20,10 +20,15 @@ pub(crate) const DEFAULT_HTTP_PORT: &str = "6564"; //< `u16` after parsing
 /// See [`crate::Cli`]'s `offsets_history`.
 pub(crate) const DEFAULT_OFFSETS_HISTORY: &str = "3600"; //< `usize` after parsing
 
-/// The default fullness percentage" at which the Partition Offset Register can be considered ready.
+/// The default fullness percentage at which the Partition Offset Register can be considered ready.
 ///
 /// See [`crate::Cli`]'s `offsets_history_ready_at`.
 pub(crate) const DEFAULT_OFFSETS_HISTORY_READY_AT: &str = "0.3"; //< `f64` after parsing
 
 /// The default `cluster_id` value, if none is provided (either via CLI override, nor Cluster configuration).
 pub(crate) const DEFAULT_CLUSTER_ID: &str = "__not-set__";
+
+/// The default duration after which a Consumer Group not reported anymore by Kafka, is forgotten.
+///
+/// See [`crate::Cli`]'s `duration_clap_value_parser`.
+pub(crate) const DEFAULT_FORGET_GROUP_AFTER_SECONDS: &str = "3600"; //< `Duration` after parsing
