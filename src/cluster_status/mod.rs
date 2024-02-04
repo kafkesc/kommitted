@@ -4,17 +4,16 @@ mod register;
 
 use std::sync::Arc;
 
-// Exports
-pub use emitter::ClusterStatusEmitter;
-pub use register::ClusterStatusRegister;
-
-// Imports
 use prometheus::Registry;
 use rdkafka::ClientConfig;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::internals::Emitter;
+use emitter::ClusterStatusEmitter;
+
+// Exports
+pub use register::ClusterStatusRegister;
 
 pub fn init(
     admin_client_config: ClientConfig,

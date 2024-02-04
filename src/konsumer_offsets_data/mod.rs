@@ -1,3 +1,4 @@
+// Inner module
 mod emitter;
 
 use konsumer_offsets::KonsumerOffsetsData;
@@ -8,6 +9,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::internals::Emitter;
 
+// Exports
 pub use emitter::KonsumerOffsetsDataEmitter;
 
 pub fn init(

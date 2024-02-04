@@ -54,7 +54,7 @@ impl PartitionOffsetsRegister {
                 &[LABEL_TOPIC, LABEL_PARTITION],
                 metrics
             )
-            .unwrap_or_else(|_| panic!("Failed to create metric: {MET_USAGE_NAME}")),
+            .unwrap_or_else(|e| panic!("Failed to create metric '{MET_USAGE_NAME}': {e}")),
         };
 
         // A clone of the `por.estimator` will be moved into the async task
