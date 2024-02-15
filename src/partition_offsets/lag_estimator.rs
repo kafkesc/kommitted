@@ -351,7 +351,7 @@ mod test {
     }
 
     #[test]
-    fn test_interpolate_offset_to_datetime() {
+    fn should_interpolate_offset_to_datetime() {
         let (off, ts) = example_tracked_offsets();
 
         let p1 = TrackedOffset {
@@ -377,7 +377,7 @@ mod test {
     }
 
     #[test]
-    fn estimate_offset_lag() {
+    fn should_estimate_offset_lag() {
         let (off, ts) = example_tracked_offsets();
 
         // Setup estimator with example input
@@ -399,7 +399,7 @@ mod test {
     }
 
     #[test]
-    fn should_ignore_updates_that_tracked_datapoints() {
+    fn should_ignore_updates_for_already_tracked_offsets() {
         let (off, ts) = example_tracked_offsets();
 
         // Setup estimator with example input
@@ -416,7 +416,7 @@ mod test {
     }
 
     #[test]
-    fn estimate_time_lag() {
+    fn should_estimate_time_lag() {
         let (off, ts) = example_tracked_offsets();
 
         // Setup estimator with example input
@@ -444,7 +444,7 @@ mod test {
     }
 
     #[test]
-    fn discard_old_tracked_offsets() {
+    fn should_discard_old_tracked_offsets() {
         let mut estimator = PartitionLagEstimator::new(5);
 
         // Add first 5 points
@@ -491,7 +491,7 @@ mod test {
     }
 
     #[test]
-    fn use_percent() {
+    fn should_provide_usage_percent() {
         let (off, ts) = example_tracked_offsets();
 
         let mut estimator = PartitionLagEstimator::new(10);
