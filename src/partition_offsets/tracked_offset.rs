@@ -153,7 +153,7 @@ mod test {
     }
 
     #[test]
-    fn search_even_input() {
+    fn should_find_within_even_input() {
         let input = build_even_input();
 
         assert!(matches!(search(0, &input), TrackedOffsetSearchRes::None));
@@ -216,7 +216,7 @@ mod test {
     }
 
     #[test]
-    fn search_odd_input() {
+    fn should_find_within_odd_input() {
         let input = build_odd_input();
 
         assert!(matches!(search(0, &input), TrackedOffsetSearchRes::None));
