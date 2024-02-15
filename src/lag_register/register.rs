@@ -136,8 +136,11 @@ async fn process_consumer_groups(
     cg_reg: Arc<ConsumerGroupsRegister>,
     lag_register_groups: Arc<RwLock<HashMap<String, GroupWithLag>>>,
 ) {
-    for group_name in cg_reg.get_groups().await {
-        if let Some(group_with_members) = cg_reg.get_group(&group_name).await {
+    let known_groups = cg_reg.get_groups().await;
+
+    // First, Loop over list of known Groups, and update `lag_register_groups`
+    for group_name in &known_groups {
+        if let Some(group_with_members) = cg_reg.get_group(group_name).await {
             let mut w_guard = lag_register_groups.write().await;
 
             // Organise all the Group Members by the TopicPartition they own
@@ -155,6 +158,7 @@ async fn process_consumer_groups(
 
             // Insert or update "group name -> group with lag" map entries
             if let Entry::Vacant(e) = w_guard.entry(group_name.clone()) {
+                // Insert
                 e.insert(GroupWithLag {
                     group: group_with_members.group,
                     // Given this is a new Group,
@@ -172,7 +176,8 @@ async fn process_consumer_groups(
                         .collect(),
                 });
             } else {
-                let gwl = w_guard.get_mut(&group_name).unwrap_or_else(|| {
+                // Update
+                let gwl = w_guard.get_mut(group_name).unwrap_or_else(|| {
                     panic!(
                         "{} for {:#?} could not be found (fatal)",
                         std::any::type_name::<GroupWithLag>(),
@@ -183,7 +188,7 @@ async fn process_consumer_groups(
                 // Set the Group (probably unchanged)
                 gwl.group = group_with_members.group;
 
-                // Remove from map of LagWithOwner the entries with key TopicPartition not owner by any member of this group
+                // Remove from map of LagWithOwner the entries with key TopicPartition not owned by any member of this group
                 gwl.lag_by_topic_partition
                     .retain(|tp, _| members_by_topic_partition.contains_key(tp));
 
@@ -202,6 +207,9 @@ async fn process_consumer_groups(
             };
         }
     }
+
+    // ... then, remove groups that are in `lag_register_groups` but are not known (anymore)
+    lag_register_groups.write().await.retain(|g, _| !known_groups.contains(g));
 }
 
 async fn process_offset_commit(
