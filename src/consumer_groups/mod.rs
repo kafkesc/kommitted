@@ -21,9 +21,6 @@ pub fn init(
     shutdown_token: CancellationToken,
     metrics: Arc<Registry>,
 ) -> (ConsumerGroupsRegister, JoinHandle<()>) {
-    let forget_after = chrono::Duration::from_std(forget_after)
-        .unwrap_or_else(|e| panic!("Failed to convert from std::Duration: {e}"));
-
     let (cg_rx, cg_join) =
         ConsumerGroupsEmitter::new(admin_client_config, metrics.clone()).spawn(shutdown_token);
     let cg_reg = ConsumerGroupsRegister::new(cg_rx, forget_after, metrics);

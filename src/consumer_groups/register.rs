@@ -60,7 +60,19 @@ impl GroupWithMembersLastSeen {
     /// # Arguments
     /// * `expire_after` - Amount of time after which this group should be considered "expired".
     pub fn is_expired(&self, expire_after: &Duration) -> bool {
-        Utc::now() - self.last_seen > *expire_after
+        match chrono::Duration::from_std(*expire_after) {
+            Ok(expire_after_chrono) => {
+                let elapsed_ms = (Utc::now() - self.last_seen).num_milliseconds();
+                let expire_after_ms = expire_after_chrono.num_milliseconds();
+                elapsed_ms > expire_after_ms
+            },
+            Err(e) => {
+                warn!("Unable to convert Duration {:?} from std to chrono: {}", expire_after, e);
+                false
+            },
+        }
+    }
+}
     }
 }
 
