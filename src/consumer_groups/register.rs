@@ -21,7 +21,7 @@ use crate::internals::Awaitable;
 use crate::kafka_types::GroupWithMembers;
 use crate::prometheus_metrics::LABEL_GROUP;
 
-const REMOVE_EXPIRED_INTERVAL: Duration = Duration::from_millis(500);
+const REMOVE_EXPIRED_INTERVAL: Duration = Duration::from_secs(1);
 
 const MET_TOT_NAME: &str = "consumer_groups_total";
 const MET_TOT_HELP: &str = "Consumer groups currently in the cluster";
@@ -193,9 +193,11 @@ impl ConsumerGroupsRegister {
                     },
                 }
 
-                info!(
-                    "Updated (Known) Consumer Groups: {}",
-                    known_groups_arc_clone.read().await.map.len()
+                let r_guard = known_groups_arc_clone.read().await;
+                trace!(
+                    "Updated (Known) Consumer Groups: {} (hash: {})",
+                    r_guard.map.len(),
+                    r_guard.hash,
                 );
             }
         });

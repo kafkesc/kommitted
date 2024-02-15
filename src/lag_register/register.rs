@@ -209,7 +209,7 @@ async fn process_consumer_groups(
     }
 
     // ... then, remove groups that are in `lag_register_groups` but are not known (anymore)
-    lag_register_groups.write().await.retain(|g, _| !known_groups.contains(g));
+    lag_register_groups.write().await.retain(|g, _| known_groups.contains(g));
 }
 
 async fn process_offset_commit(
