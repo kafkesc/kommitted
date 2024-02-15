@@ -1,21 +1,27 @@
-use std::hash::{Hash, Hasher};
 use std::{
     collections::{hash_map::DefaultHasher, HashMap},
+    hash::{Hash, Hasher},
     sync::Arc,
+    time::Duration,
 };
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use prometheus::{
     register_int_gauge_vec_with_registry, register_int_gauge_with_registry, IntGauge, IntGaugeVec,
     Registry,
 };
-use tokio::sync::{mpsc::Receiver, RwLock};
+use tokio::{
+    sync::{mpsc::Receiver, RwLock, RwLockWriteGuard},
+    time::interval,
+};
 
 use super::emitter::ConsumerGroups;
 
 use crate::internals::Awaitable;
 use crate::kafka_types::GroupWithMembers;
 use crate::prometheus_metrics::LABEL_GROUP;
+
+const REMOVE_EXPIRED_INTERVAL: Duration = Duration::from_millis(500);
 
 const MET_TOT_NAME: &str = "consumer_groups_total";
 const MET_TOT_HELP: &str = "Consumer groups currently in the cluster";
@@ -73,6 +79,25 @@ impl GroupWithMembersLastSeen {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ConsumerGroupsMap {
+    hash: u64,
+    map: HashMap<String, GroupWithMembersLastSeen>,
+}
+
+impl Default for ConsumerGroupsMap {
+    fn default() -> Self {
+        Self {
+            hash: DefaultHasher::new().finish(),
+            map: HashMap::new(),
+        }
+    }
+}
+
+impl Hash for ConsumerGroupsMap {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_u64(self.hash);
     }
 }
 
@@ -89,7 +114,7 @@ pub struct ConsumerGroupsRegister {
     /// Map ([`HashMap`]) of [`GroupWithMembersLastSeen`], paired with its own _hash_ value.
     ///
     /// The hash is calculated every time the map is updated, using [`DefaultHasher`].
-    known_groups: Arc<RwLock<(u64, HashMap<String, GroupWithMembersLastSeen>)>>,
+    known_groups: Arc<RwLock<ConsumerGroupsMap>>,
 
     /// Every time a new [`ConsumerGroups`] is received by this register,
     /// [`GroupWithMembersLastSeen`] that were not "seen" for longer than this value,
@@ -108,7 +133,7 @@ impl ConsumerGroupsRegister {
         metrics: Arc<Registry>,
     ) -> Self {
         let cgr = Self {
-            known_groups: Arc::new(RwLock::new((0u64, HashMap::new()))),
+            known_groups: Arc::new(RwLock::new(ConsumerGroupsMap::default())),
             forget_after,
             metric_tot: register_int_gauge_with_registry!(MET_TOT_NAME, MET_TOT_HELP, metrics)
                 .unwrap_or_else(|e| panic!("Failed to create metric '{MET_TOT_NAME}': {e}")),
@@ -138,6 +163,8 @@ impl ConsumerGroupsRegister {
         tokio::spawn(async move {
             debug!("Begin receiving ConsumerGroups updates");
 
+            let mut remove_expired_timeout = interval(REMOVE_EXPIRED_INTERVAL);
+
             loop {
                 tokio::select! {
                     Some(cg) = rx.recv() => {
@@ -146,27 +173,19 @@ impl ConsumerGroupsRegister {
                         // Update total metric
                         metric_tot.set(cg.groups.len() as i64);
 
-                        // Update the `known_groups` and it's hash
+                        // Upsert map entries
                         let mut w_guard = known_groups_arc_clone.write().await;
                         for (g_name, g_members) in cg.groups.into_iter() {
                             // Update group-specific metric
                             metric_members_tot.with_label_values(&[&g_name]).set(g_members.members.len() as i64);
 
-                            // Upserting the map entry
-                            w_guard.1.insert(g_name, g_members.into());
-
-                            // Remove all the Groups that have expired
-                            // (i.e. excited the expected "forget after" duration)
-                            w_guard.1.retain(|_, g| !g.is_expired(&cgr.forget_after));
-
-                            // Calculate and update the hash
-                            let mut h = DefaultHasher::new();
-                            for (g, gm) in &w_guard.1 {
-                                g.hash(&mut h);
-                                gm.hash(&mut h);
-                            }
-                            w_guard.0 = h.finish();
+                            w_guard.map.insert(g_name, g_members.into());
                         }
+
+                        remove_expired_and_update_hash(w_guard, &cgr.forget_after);
+                    },
+                    _ = remove_expired_timeout.tick() => {
+                        remove_expired_and_update_hash(known_groups_arc_clone.write().await, &cgr.forget_after);
                     },
                     else => {
                         info!("Emitters stopping: breaking (internal) loop");
@@ -176,7 +195,7 @@ impl ConsumerGroupsRegister {
 
                 info!(
                     "Updated (Known) Consumer Groups: {}",
-                    known_groups_arc_clone.read().await.1.len()
+                    known_groups_arc_clone.read().await.map.len()
                 );
             }
         });
@@ -186,7 +205,13 @@ impl ConsumerGroupsRegister {
 
     /// Returns [`Vec<String>`] with all the known Consumer Group identifiers.
     pub async fn get_groups(&self) -> Vec<String> {
-        self.known_groups.read().await.1.keys().cloned().collect()
+        self.known_groups.read().await.map.keys().cloned().collect()
+    }
+
+    /// Returns count of known Consumer Groups.
+    #[allow(dead_code)]
+    pub async fn get_groups_count(&self) -> usize {
+        self.known_groups.read().await.map.len()
     }
 
     /// Returns a specific [`GroupWithMembers`], if found.
@@ -194,19 +219,56 @@ impl ConsumerGroupsRegister {
     /// # Arguments
     /// * `group` - Consumer Group identifier (name)
     pub async fn get_group(&self, group: &str) -> Option<GroupWithMembers> {
-        self.known_groups.read().await.1.get(group).map(|g| g.group_with_members.clone())
+        self.known_groups.read().await.map.get(group).map(|g| g.group_with_members.clone())
+    }
+
+    /// Returns `true` if [`Self`] contains a specific Consumer Group.
+    ///
+    /// # Arguments
+    /// * `group` - Consumer Group identifier (name)
+    #[allow(dead_code)]
+    pub async fn contains_group(&self, group: &str) -> bool {
+        self.known_groups.read().await.map.contains_key(group)
     }
 
     /// Returns a `u64` value representing the [`Hash`] of the current [`GroupWithMembers`] held in this register.
     pub async fn get_hash(&self) -> u64 {
-        self.known_groups.read().await.0
+        self.known_groups.read().await.hash
     }
+}
+
+fn remove_expired_and_update_hash(
+    mut w_guard: RwLockWriteGuard<ConsumerGroupsMap>,
+    forget_after: &Duration,
+) {
+    // Remove all the Groups that have expired
+    // (i.e. exceeded the expected "forget after" duration)
+    w_guard.map.retain(|_, g| !g.is_expired(forget_after));
+
+    // Get group names sorted
+    let mut sorted_groups = w_guard.map.keys().by_ref().collect::<Vec<&String>>();
+    sorted_groups.sort();
+
+    // Calculate the new hash, minding to keep the order of the groups stable
+    let mut hasher = DefaultHasher::new();
+    for g in sorted_groups {
+        match w_guard.map.get_key_value(g) {
+            Some((g, gm)) => {
+                g.hash(&mut hasher);
+                gm.hash(&mut hasher);
+            },
+            None => {
+                panic!("Group {} is missing: this should never happen", g);
+            },
+        }
+    }
+    w_guard.hash = hasher.finish();
 }
 
 impl Awaitable for ConsumerGroupsRegister {
     /// [`Self`] ready when it's not empty.
     async fn is_ready(&self) -> bool {
-        !self.known_groups.read().await.1.is_empty()
+        !self.known_groups.read().await.map.is_empty()
     }
 }
 
