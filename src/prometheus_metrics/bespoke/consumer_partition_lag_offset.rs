@@ -11,7 +11,7 @@ use super::{normalize_owner_data, HEADER_HELP, HEADER_TYPE, TYPE_GAUGE};
 
 const NAME: &str = formatcp!("{NAMESPACE}_kafka_consumer_partition_lag_offset");
 const HELP: &str =
-    formatcp!("{HEADER_HELP} {NAME} The difference (lag) between the last produced offset and the last consumed offset, by the consumer of the topic partition. NOTE: '0, -1' means 'unknown'.");
+    formatcp!("{HEADER_HELP} {NAME} The difference (lag) between the last produced offset and the last consumed offset, by the consumer of the topic partition. NOTE: '-1' means 'unknown'.");
 const TYPE: &str = formatcp!("{HEADER_TYPE} {NAME} {TYPE_GAUGE}");
 
 pub(crate) fn append_headers(res: &mut Vec<String>) {
@@ -30,10 +30,10 @@ pub(crate) fn append_metric(
 ) {
     let (member_id, member_host, member_client_id) = normalize_owner_data(owner);
 
-    let (offset_lag, offset_timestamp_utc_ms) = if let Some(l) = lag {
-        (l.offset_lag, l.offset_timestamp.timestamp_millis())
+    let value_and_ts = if let Some(l) = lag {
+        format!("{} {}", l.offset_lag, l.offset_timestamp.timestamp_millis())
     } else {
-        (0, -1)
+        "-1".into()
     };
 
     res.push(format!(
@@ -47,7 +47,6 @@ pub(crate) fn append_metric(
             {LABEL_MEMBER_HOST}=\"{member_host}\",\
             {LABEL_MEMBER_CLIENT_ID}=\"{member_client_id}\"\
         }} \
-        {offset_lag} \
-        {offset_timestamp_utc_ms}"
+        {value_and_ts}"
     ));
 }
