@@ -14,9 +14,9 @@ mod logging;
 mod partition_offsets;
 mod prometheus_metrics;
 
-use clap::Parser;
 use std::{error::Error, sync::Arc};
 
+use clap::Parser;
 use tokio_util::sync::CancellationToken;
 
 use crate::cli::Cli;
@@ -42,6 +42,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
     cs_reg.await_ready(shutdown_token.clone()).await?;
     let cs_reg_arc = Arc::new(cs_reg);
 
+    // Init `consumer_groups` module
+    let (cg_reg, cg_join) = consumer_groups::init(
+        admin_client_config.clone(),
+        cli.forget_group_after,
+        shutdown_token.clone(),
+        prom_reg_arc.clone(),
+    );
+    cg_reg.await_ready(shutdown_token.clone()).await?;
+    let cg_reg_arc = Arc::new(cg_reg);
+
     // Init `partition_offsets` module, and await registry to be ready
     let (po_reg, po_join) = partition_offsets::init(
         admin_client_config.clone(),
@@ -58,15 +68,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let (kod_rx, kod_join) =
         konsumer_offsets_data::init(admin_client_config.clone(), shutdown_token.clone());
 
-    // Init `consumer_groups` module
-    let (cg_rx, cg_join) = consumer_groups::init(
-        admin_client_config.clone(),
-        shutdown_token.clone(),
-        prom_reg_arc.clone(),
-    );
-
     // Init `lag_register` module, and await registry to be ready
-    let lag_reg = lag_register::init(cg_rx, kod_rx, po_reg_arc.clone());
+    let lag_reg = lag_register::init(kod_rx, cg_reg_arc.clone(), po_reg_arc.clone());
     lag_reg.await_ready(shutdown_token.clone()).await?;
     let lag_reg_arc = Arc::new(lag_reg);
 
@@ -101,7 +104,7 @@ fn build_shutdown_token() -> CancellationToken {
     let shutdown_token = CancellationToken::new();
 
     // Setup shutdown signal handler:
-    // when it's time to shutdown, cancels the token and all
+    // when it's time to shut down, cancels the token and all
     // other holders of a clone will be notified to being shutdown sequence.
     //
     // NOTE: This handler will be listening on its own dedicated thread.

@@ -5,20 +5,19 @@ mod lag_estimator;
 mod register;
 mod tracked_offset;
 
-// Exports
-pub use emitter::PartitionOffsetsEmitter;
-pub use register::PartitionOffsetsRegister;
-
-// Imports
-use prometheus::Registry;
 use std::sync::Arc;
 
+use prometheus::Registry;
 use rdkafka::ClientConfig;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::cluster_status::ClusterStatusRegister;
 use crate::internals::Emitter;
+use emitter::PartitionOffsetsEmitter;
+
+// Exports
+pub use register::PartitionOffsetsRegister;
 
 pub fn init(
     admin_client_config: ClientConfig,

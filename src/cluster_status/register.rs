@@ -50,26 +50,28 @@ impl ClusterStatusRegister {
                 MET_BROKERS_TOT_HELP,
                 metrics
             )
-            .unwrap_or_else(|_| panic!("Failed to create metric: {MET_BROKERS_TOT_NAME}")),
+            .unwrap_or_else(|e| panic!("Failed to create metric '{MET_BROKERS_TOT_NAME}': {e}")),
             metric_topics: register_int_gauge_with_registry!(
                 MET_TOPICS_TOT_NAME,
                 MET_TOPICS_TOT_HELP,
                 metrics
             )
-            .unwrap_or_else(|_| panic!("Failed to create metric: {MET_TOPICS_TOT_NAME}")),
+            .unwrap_or_else(|e| panic!("Failed to create metric '{MET_TOPICS_TOT_NAME}': {e}")),
             metric_partitions: register_int_gauge_with_registry!(
                 MET_PARTITIONS_TOT_NAME,
                 MET_PARTITIONS_TOT_HELP,
                 metrics
             )
-            .unwrap_or_else(|_| panic!("Failed to create metric: {MET_PARTITIONS_TOT_NAME}")),
+            .unwrap_or_else(|e| panic!("Failed to create metric '{MET_PARTITIONS_TOT_NAME}': {e}")),
             metric_topic_partitions: register_int_gauge_vec_with_registry!(
                 MET_TOPIC_PARTITIONS_TOT_NAME,
                 MET_TOPIC_PARTITIONS_TOT_HELP,
                 &[LABEL_TOPIC],
                 metrics
             )
-            .unwrap_or_else(|_| panic!("Failed to create metric: {MET_TOPIC_PARTITIONS_TOT_NAME}")),
+            .unwrap_or_else(|e| {
+                panic!("Failed to create metric '{MET_TOPIC_PARTITIONS_TOT_NAME}': {e}")
+            }),
         };
 
         // A clone of the `csr.latest_status` will be moved into the async task

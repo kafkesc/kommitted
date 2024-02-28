@@ -1,10 +1,15 @@
-use std::net::{IpAddr, SocketAddr};
+use std::{
+    net::{IpAddr, SocketAddr},
+    num::ParseIntError,
+    time::Duration,
+};
 
 use clap::{ArgGroup, Parser};
 use rdkafka::ClientConfig;
 
 use crate::constants::{
-    DEFAULT_HTTP_HOST, DEFAULT_HTTP_PORT, DEFAULT_OFFSETS_HISTORY, DEFAULT_OFFSETS_HISTORY_READY_AT,
+    DEFAULT_FORGET_GROUP_AFTER_SECONDS, DEFAULT_HTTP_HOST, DEFAULT_HTTP_PORT,
+    DEFAULT_OFFSETS_HISTORY, DEFAULT_OFFSETS_HISTORY_READY_AT,
 };
 
 /// Command Line Interface, defined via the declarative,
@@ -81,6 +86,21 @@ pub struct Cli {
     )]
     pub offsets_history_ready_at: f64,
 
+    /// Amount of time (in seconds) after which a Consumer Group that is no longer being reported
+    /// by the Kafka Cluster, is effectively forgotten.
+    ///
+    /// "Forgotten" here means "its metric stops being calculated and reported".
+    ///
+    /// The default value is chosen sensibly, but tune based on how long you expect your outages to last.
+    #[arg(
+        long = "forget-group-after",
+        value_name = "FORGET_GROUP_AFTER_SECONDS",
+        default_value = DEFAULT_FORGET_GROUP_AFTER_SECONDS,
+        value_parser = duration_clap_value_parser,
+        verbatim_doc_comment
+    )]
+    pub forget_group_after: Duration,
+
     /// Host address to listen on for HTTP requests.
     ///
     /// Supports both IPv4 and IPv6 addresses.
@@ -151,6 +171,8 @@ fn kv_clap_value_parser(kv: &str) -> Result<KVPair, String> {
     Ok((k.to_string(), v.to_string()))
 }
 
+/// To be used as [`clap::value_parser`] function to create [`f64`] values representing percentages,
+/// expressed in the closed range `[0.0, 1.0]`.
 fn percent_clap_value_parser(percent_str: &str) -> Result<f64, String> {
     let percent =
         percent_str.parse::<f64>().map_err(|e| format!("Unable to parse {percent_str}: {e}"))?;
@@ -160,4 +182,9 @@ fn percent_clap_value_parser(percent_str: &str) -> Result<f64, String> {
     }
 
     Ok(percent)
+}
+
+/// To be used as [`clap::value_parser`] function to create [`Duration`] values.
+fn duration_clap_value_parser(arg: &str) -> Result<Duration, ParseIntError> {
+    Ok(Duration::from_secs(arg.parse()?))
 }

@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::{Hash, Hasher},
+};
 
 use crate::kafka_types::TopicPartition;
 
@@ -25,8 +28,17 @@ pub struct MemberWithAssignment {
     pub assignment: HashSet<TopicPartition>,
 }
 
+impl Hash for MemberWithAssignment {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.member.hash(state);
+        for tp in &self.assignment {
+            tp.hash(state);
+        }
+    }
+}
+
 /// Consumer Group
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Hash)]
 pub struct Group {
     /// Group name
     pub name: String,
@@ -46,4 +58,14 @@ pub struct Group {
 pub struct GroupWithMembers {
     pub group: Group,
     pub members: HashMap<String, MemberWithAssignment>,
+}
+
+impl Hash for GroupWithMembers {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.group.hash(state);
+        for (g, gm) in &self.members {
+            g.hash(state);
+            gm.hash(state);
+        }
+    }
 }

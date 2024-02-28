@@ -1,12 +1,13 @@
 use std::{
+    any::type_name,
     collections::{HashMap, HashSet},
     sync::Arc,
 };
 
 use konsumer_offsets::ConsumerProtocolAssignment;
 use prometheus::{
-    register_histogram_with_registry, register_int_gauge_vec_with_registry,
-    register_int_gauge_with_registry, Histogram, IntGauge, IntGaugeVec, Registry,
+    register_histogram_with_registry, register_int_gauge_with_registry, Histogram, IntGauge,
+    Registry,
 };
 use rdkafka::{admin::AdminClient, client::DefaultClientContext, groups::GroupList, ClientConfig};
 use tokio::{
@@ -19,17 +20,12 @@ use tokio_util::sync::CancellationToken;
 use crate::constants::KOMMITTED_CONSUMER_OFFSETS_CONSUMER;
 use crate::internals::Emitter;
 use crate::kafka_types::{Group, GroupWithMembers, Member, MemberWithAssignment, TopicPartition};
-use crate::prometheus_metrics::LABEL_GROUP;
 
 const CHANNEL_SIZE: usize = 5;
 
 const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 const FETCH_INTERVAL: Duration = Duration::from_secs(60);
 
-const MET_TOT_NAME: &str = "consumer_groups_total";
-const MET_TOT_HELP: &str = "Consumer groups currently in the cluster";
-const MET_MEMBERS_TOT_NAME: &str = "consumer_groups_members_total";
-const MET_MEMBERS_TOT_HELP: &str = "Members of consumer groups currently in the cluster";
 const MET_FETCH_NAME: &str = "consumer_groups_emitter_fetch_time_milliseconds";
 const MET_FETCH_HELP: &str =
     "Time (ms) taken to fetch information about all consumer groups in cluster";
@@ -115,8 +111,6 @@ pub struct ConsumerGroupsEmitter {
     admin_client_config: ClientConfig,
 
     // Prometheus Metrics
-    metric_tot: IntGauge,
-    metric_members_tot: IntGaugeVec,
     metric_fetch: Histogram,
     metric_ch_cap: IntGauge,
 }
@@ -130,27 +124,18 @@ impl ConsumerGroupsEmitter {
     pub fn new(admin_client_config: ClientConfig, metrics: Arc<Registry>) -> Self {
         Self {
             admin_client_config,
-            metric_tot: register_int_gauge_with_registry!(MET_TOT_NAME, MET_TOT_HELP, metrics)
-                .unwrap_or_else(|_| panic!("Failed to create metric: {MET_TOT_NAME}")),
-            metric_members_tot: register_int_gauge_vec_with_registry!(
-                MET_MEMBERS_TOT_NAME,
-                MET_MEMBERS_TOT_HELP,
-                &[LABEL_GROUP],
-                metrics
-            )
-            .unwrap_or_else(|_| panic!("Failed to create metric: {MET_MEMBERS_TOT_NAME}")),
             metric_fetch: register_histogram_with_registry!(
                 MET_FETCH_NAME,
                 MET_FETCH_HELP,
                 metrics
             )
-            .unwrap_or_else(|_| panic!("Failed to create metric: {MET_FETCH_NAME}")),
+            .unwrap_or_else(|e| panic!("Failed to create metric '{MET_FETCH_NAME}': {e}")),
             metric_ch_cap: register_int_gauge_with_registry!(
                 MET_CH_CAP_NAME,
                 MET_CH_CAP_HELP,
                 metrics
             )
-            .unwrap_or_else(|_| panic!("Failed to create metric: {MET_CH_CAP_NAME}")),
+            .unwrap_or_else(|e| panic!("Failed to create metric '{MET_CH_CAP_NAME}': {e}")),
         }
     }
 }
@@ -178,8 +163,6 @@ impl Emitter for ConsumerGroupsEmitter {
         let (sx, rx) = mpsc::channel::<Self::Emitted>(CHANNEL_SIZE);
 
         // Clone metrics so they can be used in the spawned future
-        let metric_cg = self.metric_tot.clone();
-        let metric_cg_members = self.metric_members_tot.clone();
         let metric_cg_fetch = self.metric_fetch.clone();
         let metric_cg_ch_cap = self.metric_ch_cap.clone();
 
@@ -197,18 +180,13 @@ impl Emitter for ConsumerGroupsEmitter {
 
                 match res_cg {
                     Ok(cg) => {
-                        // Update group and group member metrics
-                        metric_cg.set(cg.groups.len() as i64);
-                        for (g, gm) in cg.groups.iter() {
-                            metric_cg_members.with_label_values(&[&g]).set(gm.members.len() as i64);
-                        }
                         // Update channel capacity metric
                         metric_cg_ch_cap.set(sx.capacity() as i64);
 
                         tokio::select! {
                             res = Self::emit_with_interval(&sx, cg, &mut interval) => {
                                 if let Err(e) = res {
-                                    error!("Failed to emit {}: {e}", std::any::type_name::<ConsumerGroups>());
+                                    error!("Failed to emit {}: {e}", type_name::<ConsumerGroups>());
                                 }
                             },
                             _ = shutdown_token.cancelled() => {

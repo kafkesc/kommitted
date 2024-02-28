@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{any::type_name, sync::Arc};
 
 use prometheus::{
     register_histogram_with_registry, register_int_gauge_with_registry, Histogram, IntGauge,
@@ -89,13 +89,13 @@ impl ClusterStatusEmitter {
                 MET_FETCH_HELP,
                 metrics
             )
-            .unwrap_or_else(|_| panic!("Failed to create metric: {MET_FETCH_NAME}")),
+            .unwrap_or_else(|e| panic!("Failed to create metric '{MET_FETCH_NAME}': {e}")),
             metric_ch_cap: register_int_gauge_with_registry!(
                 MET_CH_CAP_NAME,
                 MET_CH_CAP_HELP,
                 metrics
             )
-            .unwrap_or_else(|_| panic!("Failed to create metric: {MET_CH_CAP_NAME}")),
+            .unwrap_or_else(|e| panic!("Failed to create metric '{MET_CH_CAP_NAME}': {e}")),
         }
     }
 }
@@ -146,7 +146,7 @@ impl Emitter for ClusterStatusEmitter {
                         tokio::select! {
                             res = Self::emit_with_interval(&sx, status, &mut interval) => {
                                 if let Err(e) = res {
-                                    error!("Failed to emit {}: {e}", std::any::type_name::<ClusterStatus>());
+                                    error!("Failed to emit {}: {e}", type_name::<ClusterStatus>());
                                 }
                             },
                             _ = shutdown_token.cancelled() => {

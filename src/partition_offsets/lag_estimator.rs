@@ -156,17 +156,26 @@ impl PartitionLagEstimator {
     /// Extrapolates the given consumer group offset and related read date time for this partition,
     /// a returns a [`Duration`] estimation of the time lag accumulated by the consumer group.
     ///
+    /// What is measured is the difference of time between when the give `offset` was produced
+    /// (estimated), and how far behind in time is the Consumer, if it consumed it right now.
+    ///
     /// This estimation is done by a linear interpolation/extrapolation, where the fixed points
     /// are the [`TrackedOffset`]s contained in the [`PartitionLagEstimator`] at the time of call.
+    ///
+    /// When a Consumer stops committing offsets (i.e. stalls, fails, crashes...), time does
+    /// keep moving forward. And, in normal circumstances, producers are still writing to the partition.
+    /// This method can be used to estimate a moving-lag: the consumer stopped but the partition
+    /// is still being written to. The way to do it, is to provide as arguments the last known
+    /// Consumer-committed offset, and the latest produced offset timestamp.
     ///
     /// # Arguments
     ///
     /// * `offset` - Given offset we want to compare against the latest tracked offset
-    /// * `offset_datetime` - The [`DateTime<Utc>`] this offset was committed
+    /// * `offset_at` - [`DateTime<Utc>`] at which the latest consumed `offset` is know to be at
     pub fn estimate_time_lag(
         &self,
         offset: u64,
-        offset_datetime: DateTime<Utc>,
+        offset_at: DateTime<Utc>,
     ) -> PartitionOffsetsResult<Duration> {
         // It's rare, but if we happen to receive a consumed offset that is ahead of the last
         // tracked end offset, we can just return a Duration of `0` for time lag.
@@ -195,11 +204,11 @@ impl PartitionLagEstimator {
                 let latest_tracked = self.latest_tracked_offset()?;
                 let second_latest_tracked = self.nth_latest_tracked_offset(2)?;
 
-                // Estimate production time, considering widest range possible: earliest and latest tracked
+                // Estimate production time, considering the widest range possible: earliest and latest tracked
                 let widest_estimate =
                     interpolate_offset_to_datetime(earliest_tracked, latest_tracked, offset)?;
 
-                // Estimate production time, considering narrowest range possible: 2nd-latest and latest tracked
+                // Estimate production time, considering the narrowest range possible: 2nd-latest and latest tracked
                 let narrowest_estimate =
                     interpolate_offset_to_datetime(second_latest_tracked, latest_tracked, offset)?;
 
@@ -217,13 +226,13 @@ impl PartitionLagEstimator {
         //
         // While it's not possible for an offset to be consumed before it's produced (obviously),
         // it can happen that the linear interpolation done above, estimates the production time
-        // to be later then it ACTUALLY was.
+        // to be later than it ACTUALLY was.
         //
         // When that happen, is perfectly ok to consider the time lag to be EFFECTIVELY zero.
-        if offset_datetime < estimated_produced_offset_datetime {
+        if offset_at < estimated_produced_offset_datetime {
             Ok(Duration::zero())
         } else {
-            Ok(offset_datetime - estimated_produced_offset_datetime)
+            Ok(offset_at - estimated_produced_offset_datetime)
         }
     }
 
@@ -351,7 +360,7 @@ mod test {
     }
 
     #[test]
-    fn test_interpolate_offset_to_datetime() {
+    fn should_interpolate_offset_to_datetime() {
         let (off, ts) = example_tracked_offsets();
 
         let p1 = TrackedOffset {
@@ -377,7 +386,7 @@ mod test {
     }
 
     #[test]
-    fn estimate_offset_lag() {
+    fn should_estimate_offset_lag() {
         let (off, ts) = example_tracked_offsets();
 
         // Setup estimator with example input
@@ -399,7 +408,7 @@ mod test {
     }
 
     #[test]
-    fn should_ignore_updates_that_tracked_datapoints() {
+    fn should_ignore_updates_for_already_tracked_offsets() {
         let (off, ts) = example_tracked_offsets();
 
         // Setup estimator with example input
@@ -416,7 +425,7 @@ mod test {
     }
 
     #[test]
-    fn estimate_time_lag() {
+    fn should_estimate_time_lag() {
         let (off, ts) = example_tracked_offsets();
 
         // Setup estimator with example input
@@ -444,7 +453,7 @@ mod test {
     }
 
     #[test]
-    fn discard_old_tracked_offsets() {
+    fn should_discard_old_tracked_offsets() {
         let mut estimator = PartitionLagEstimator::new(5);
 
         // Add first 5 points
@@ -491,7 +500,7 @@ mod test {
     }
 
     #[test]
-    fn use_percent() {
+    fn should_provide_usage_percent() {
         let (off, ts) = example_tracked_offsets();
 
         let mut estimator = PartitionLagEstimator::new(10);
