@@ -1,6 +1,8 @@
 use std::{
+    any::type_name,
     collections::{hash_map::Entry, HashMap},
     sync::Arc,
+    time::Duration as StdDuration,
 };
 
 use chrono::{DateTime, Duration, Utc};
@@ -95,11 +97,22 @@ impl LagRegister {
                     Some(kod) = kod_rx.recv() => {
                         match kod {
                             KonsumerOffsetsData::OffsetCommit(oc) => {
-                                trace!("Processing {} of Group '{}' for Topic Partition '{}:{}'", std::any::type_name::<OffsetCommit>(), oc.group, oc.topic, oc.partition);
+                                trace!(
+                                    "Processing {} of Group '{}' for Topic Partition '{}:{}'",
+                                    type_name::<OffsetCommit>(),
+                                    oc.group,
+                                    oc.topic,
+                                    oc.partition
+                                );
                                 process_offset_commit(oc, lag_by_group_clone.clone(), po_reg.clone()).await;
                             },
                             KonsumerOffsetsData::GroupMetadata(gm) => {
-                                debug!("Processing {} of Group '{}' with {} Members", std::any::type_name::<GroupMetadata>(), gm.group, gm.members.len());
+                                trace!(
+                                    "Processing {} of Group '{}' with {} Members",
+                                    type_name::<GroupMetadata>(),
+                                    gm.group,
+                                    gm.members.len()
+                                );
                                 process_group_metadata(gm, lag_by_group_clone.clone()).await;
                             }
                         }
@@ -180,7 +193,7 @@ async fn process_consumer_groups(
                 let gwl = w_guard.get_mut(group_name).unwrap_or_else(|| {
                     panic!(
                         "{} for {:#?} could not be found (fatal)",
-                        std::any::type_name::<GroupWithLag>(),
+                        type_name::<GroupWithLag>(),
                         group_name
                     )
                 });
@@ -229,22 +242,22 @@ async fn process_offset_commit(
                 offset_lag: po_reg.estimate_offset_lag(&tp, oc.offset as u64)
                     .await
                     .unwrap_or_else(|e| {
-                    debug!(
+                        debug!(
                             "Failed to estimate Offset Lag of Group '{}' for Topic Partition '{}': {}",
                             oc.group, tp, e
                         );
-                    0
-                }),
+                        0
+                    }),
                 time_lag: po_reg
                     .estimate_time_lag(&tp, oc.offset as u64, oc.commit_timestamp)
                     .await
                     .unwrap_or_else(|e| {
-                    debug!(
+                        debug!(
                             "Failed to estimate Time Lag of Group '{}' for Topic Partition '{}': {}",
                             oc.group, tp, e
                         );
-                    Duration::zero()
-                }),
+                        Duration::zero()
+                    }),
             };
 
             // Create or update entry `TopicPartition -> LagWithOwner`:
@@ -261,7 +274,7 @@ async fn process_offset_commit(
         None if oc.group != KOMMITTED_CONSUMER_OFFSETS_CONSUMER => {
             warn!(
                 "Received {} about unknown Group '{}': ignoring",
-                std::any::type_name::<OffsetCommit>(),
+                type_name::<OffsetCommit>(),
                 oc.group
             );
         },
@@ -336,7 +349,7 @@ async fn process_group_metadata(
         None if gm.group != KOMMITTED_CONSUMER_OFFSETS_CONSUMER => {
             warn!(
                 "Received {} about unknown Group '{}': ignoring",
-                std::any::type_name::<GroupMetadata>(),
+                type_name::<GroupMetadata>(),
                 gm.group
             );
         },
