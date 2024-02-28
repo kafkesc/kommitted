@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{any::type_name, sync::Arc};
 
 use chrono::{DateTime, Utc};
 use prometheus::{
@@ -149,7 +149,7 @@ impl Emitter for PartitionOffsetsEmitter {
                                 tokio::select! {
                                     res = Self::emit(&sx, po) => {
                                         if let Err(e) = res {
-                                            error!("Failed to emit {}: {e}", std::any::type_name::<PartitionOffset>());
+                                            error!("Failed to emit {}: {e}", type_name::<PartitionOffset>());
                                         }
                                     },
                                     _ = shutdown_token.cancelled() => {

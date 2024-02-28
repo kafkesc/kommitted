@@ -1,9 +1,10 @@
+use std::any::type_name;
+
 use konsumer_offsets::KonsumerOffsetsData;
-use rdkafka::error::KafkaError;
 use rdkafka::{
     config::RDKafkaLogLevel,
     consumer::{Consumer, ConsumerContext, Rebalance, StreamConsumer},
-    error::KafkaResult,
+    error::{KafkaError, KafkaResult},
     ClientConfig, ClientContext, Message, Offset, TopicPartitionList,
 };
 use tokio::{sync::mpsc, task::JoinHandle, time::Duration};
@@ -167,7 +168,7 @@ impl Emitter for KonsumerOffsetsDataEmitter {
                                 match konsumer_offsets::KonsumerOffsetsData::try_from_bytes(m.key(), m.payload()) {
                                     Ok(kod) => {
                                         if let Err(e) = Self::emit(&sx, kod).await {
-                                            error!("Failed to emit {}: {e}", std::any::type_name::<KonsumerOffsetsData>());
+                                            error!("Failed to emit {}: {e}", type_name::<KonsumerOffsetsData>());
                                         }
                                     }
                                     Err(e) => {

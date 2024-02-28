@@ -1,3 +1,5 @@
+use std::any::type_name;
+
 use thiserror::Error;
 use tokio::{time::interval, time::Duration};
 use tokio_util::sync::CancellationToken;
@@ -24,12 +26,12 @@ pub trait Awaitable {
             tokio::select! {
                 _ = interval.tick() => {
                     if self.is_ready().await {
-                        info!("{} is ready!", std::any::type_name::<Self>());
+                        info!("{} is ready!", type_name::<Self>());
                         return Ok(());
                     }
                 },
                 _ = shutdown_token.cancelled() => {
-                    warn!("{} received shutdown signal before it was ready!", std::any::type_name::<Self>());
+                    warn!("{} received shutdown signal before it was ready!", type_name::<Self>());
                     return Err(AwaitableError::Cancelled);
                 },
             }

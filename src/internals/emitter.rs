@@ -1,3 +1,5 @@
+use std::any::type_name;
+
 use tokio::{sync::mpsc, task::JoinHandle, time::Interval};
 use tokio_util::sync::CancellationToken;
 
@@ -48,7 +50,7 @@ pub trait Emitter {
         if sender.capacity() == 0 {
             trace!(
                 "Channel to emit {} saturated: receiver too slow or service still starting?",
-                std::any::type_name::<Self::Emitted>()
+                type_name::<Self::Emitted>()
             );
         }
 

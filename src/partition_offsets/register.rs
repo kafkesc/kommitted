@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{any::type_name, collections::HashMap, sync::Arc};
 
 use chrono::{DateTime, Duration, Utc};
 use prometheus::{register_int_gauge_vec_with_registry, IntGaugeVec, Registry};
@@ -99,7 +99,7 @@ impl PartitionOffsetsRegister {
                         // Get exclusive write lock on the specific partition esimator
                         let estimator_rwlock = r_guard
                             .get(&k)
-                            .unwrap_or_else(|| panic!("{} for {:#?} could not be found (fatal)", std::any::type_name::<PartitionLagEstimator>(), k));
+                            .unwrap_or_else(|| panic!("{} for {:#?} could not be found (fatal)", type_name::<PartitionLagEstimator>(), k));
 
                         // Update the PartitionLagEstimator
                         estimator_rwlock

@@ -1,4 +1,5 @@
 use std::{
+    any::type_name,
     collections::{HashMap, HashSet},
     sync::Arc,
 };
@@ -185,7 +186,7 @@ impl Emitter for ConsumerGroupsEmitter {
                         tokio::select! {
                             res = Self::emit_with_interval(&sx, cg, &mut interval) => {
                                 if let Err(e) = res {
-                                    error!("Failed to emit {}: {e}", std::any::type_name::<ConsumerGroups>());
+                                    error!("Failed to emit {}: {e}", type_name::<ConsumerGroups>());
                                 }
                             },
                             _ = shutdown_token.cancelled() => {
