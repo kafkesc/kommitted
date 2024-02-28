@@ -273,6 +273,14 @@ async fn process_group_metadata(
     gm: GroupMetadata,
     lag_register_groups: Arc<RwLock<HashMap<String, GroupWithLag>>>,
 ) {
+    // Ignore event if the Group is empty: this usually means that the Group is gone (i.e. all
+    // Consumers in the Group are gone), and we don't want to lose the lag information just yet.
+    // The Group will be "forgotten" once the `ConsumerGroupRegister` says so.
+    if gm.members.is_empty() {
+        debug!("Ignoring {:?}: no Members", gm);
+        return;
+    }
+
     let mut w_guard = lag_register_groups.write().await;
     match w_guard.get_mut(&gm.group) {
         Some(gwl) => {
