@@ -8,7 +8,10 @@ use std::{
 use chrono::{DateTime, Duration, Utc};
 use konsumer_offsets::{GroupMetadata, KonsumerOffsetsData, OffsetCommit};
 use log::Level::Trace;
-use tokio::sync::{mpsc, RwLock};
+use tokio::{
+    sync::{mpsc, RwLock},
+    time::interval,
+};
 
 use crate::constants::KOMMITTED_CONSUMER_OFFSETS_CONSUMER;
 use crate::consumer_groups::ConsumerGroupsRegister;
@@ -16,23 +19,45 @@ use crate::internals::Awaitable;
 use crate::kafka_types::{Group, Member, TopicPartition};
 use crate::partition_offsets::PartitionOffsetsRegister;
 
+const RECONCILE_INTERVAL: StdDuration = StdDuration::from_secs(1);
+const LAG_STALE_AFTER: Duration = Duration::seconds(5);
+
 /// Describes the "lag" (or "latency"), and it's usually paired with a Consumer [`GroupWithMembers`].
 ///
 /// Additionally, it carries the "context" of the lag, including the offsets like the one
 /// it was measured against, the earliest and the latest (tracked and available).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Lag {
-    /// Offset that a given Consumer [`GroupWithMembers`] is at when consuming a specific [`TopicPartition`].
+    /// Offset that a given Consumer [`GroupWithMembers`] is at when consuming a specific [`TopicPartition`], at the given `offset_timestamp`.
     pub(crate) offset: u64,
 
     /// [`DateTime<Utc>`] that the `offset` was consumed by the Consumer Group.
     pub(crate) offset_timestamp: DateTime<Utc>,
 
-    /// Lag in consuming a specific [`TopicPartition`] as reported by the the Consumer (and in the `__consumer_offsets` internal topic).
+    /// Last [`DateTime<Utc>`] when this [`Self`] was updated.
+    ///
+    /// When [`Self`] gets updated by the Consumer committed offset information, this and
+    /// `offset_timestamp` have the same value. But if the Consumer stalls for whatever reason,
+    /// and [`Self`] gets stale, this fields starts drifting forward.
+    pub(crate) timestamp: DateTime<Utc>,
+
+    /// Lag in consuming a specific [`TopicPartition`] as reported by the Consumer [`GroupWithMembers`].
+    ///
+    /// It is the numeric distance between the last offset consumed by a group,
+    /// and the high watermark (end offset) of the [`TopicPartition`] was produced.
     pub(crate) offset_lag: u64,
 
-    /// Estimated time latency between the Consumer [`GroupWithMembers`] consuming a specific [`TopicPartition`], and the [`DateTime<Utc>`] when the high watermark (end offset) was produced.
+    /// Estimated time latency between the Consumer [`GroupWithMembers`] consuming a specific [`TopicPartition`],
+    /// and the [`DateTime<Utc>`] when the high watermark (end offset) was produced.
     pub(crate) time_lag: Duration,
+}
+
+impl Lag {
+    /// Returns `true` when last time this [`Self`] was updated via Consumer committed offset information
+    /// was longer than [`LAG_STALE_AFTER`] ago.
+    fn is_stale(&self) -> bool {
+        Utc::now() - self.offset_timestamp > LAG_STALE_AFTER
+    }
 }
 
 impl Default for Lag {
@@ -42,6 +67,7 @@ impl Default for Lag {
             offset_timestamp: DateTime::<Utc>::default(),
             offset_lag: 0,
             time_lag: Duration::zero(),
+            timestamp: DateTime::<Utc>::default(),
         }
     }
 }
@@ -78,21 +104,15 @@ impl LagRegister {
         let lag_by_group_clone = lr.lag_by_group.clone();
 
         tokio::spawn(async move {
-            let cg_reg_curr_hash = 0u64;
+            // Processing Consumer Groups Register to populate this register for the first time
+            process_consumer_groups(cg_reg.clone(), lag_by_group_clone.clone()).await;
+            let mut cg_reg_curr_hash = cg_reg.get_hash().await;
+
+            // Setup interval for "reconciling" this Register with the Consumer Group Register
+            // and doing other necessary internal updates (e.g. lag).
+            let mut reconcile_timeout = interval(RECONCILE_INTERVAL);
 
             loop {
-                // Only update internal Map of Groups if the ConsumerGroupsRegister has changed
-                let cg_reg_latest_hash = cg_reg.get_hash().await;
-                if cg_reg_curr_hash != cg_reg_latest_hash {
-                    trace!(
-                        "Processing updated {} (hash {} != {})",
-                        std::any::type_name::<ConsumerGroupsRegister>(),
-                        cg_reg_curr_hash,
-                        cg_reg_latest_hash
-                    );
-                    process_consumer_groups(cg_reg.clone(), lag_by_group_clone.clone()).await;
-                }
-
                 tokio::select! {
                     Some(kod) = kod_rx.recv() => {
                         match kod {
@@ -116,6 +136,24 @@ impl LagRegister {
                                 process_group_metadata(gm, lag_by_group_clone.clone()).await;
                             }
                         }
+                    },
+                    _ = reconcile_timeout.tick() => {
+                        // Update internal Map of Groups if the ConsumerGroupsRegister has changed:
+                        // we do that by keeping track of the register "hash".
+                        let cg_reg_latest_hash = cg_reg.get_hash().await;
+                        if cg_reg_curr_hash != cg_reg_latest_hash {
+                            trace!(
+                                "Processing updated {} (hash {} != {})",
+                                type_name::<ConsumerGroupsRegister>(),
+                                cg_reg_curr_hash,
+                                cg_reg_latest_hash
+                            );
+                            process_consumer_groups(cg_reg.clone(), lag_by_group_clone.clone()).await;
+                            cg_reg_curr_hash = cg_reg_latest_hash;
+                        }
+
+                        // Update stale Lags for all touples (Topic, Partition, Group) known to this register
+                        update_stale_lags(lag_by_group_clone.clone(), po_reg.clone()).await;
                     },
                     else => {
                         info!("Emitters stopping: breaking (internal) loop");
@@ -225,6 +263,54 @@ async fn process_consumer_groups(
     lag_register_groups.write().await.retain(|g, _| known_groups.contains(g));
 }
 
+async fn update_stale_lags(
+    lag_register_groups: Arc<RwLock<HashMap<String, GroupWithLag>>>,
+    po_reg: Arc<PartitionOffsetsRegister>,
+) {
+    // Loop over all the existing Lag data we have
+    for (g, group_wl) in lag_register_groups.write().await.iter_mut() {
+        for (tp, lag_wo) in group_wl.lag_by_topic_partition.iter_mut() {
+            if let Some(curr_lag) = &mut lag_wo.lag {
+                // Only proceed to update the lag, if it is stale
+                if !curr_lag.is_stale() {
+                    break;
+                }
+
+                // Fetch the latest produced offset we know about for this Topic-Partition
+                let latest_offset = match po_reg.get_latest_tracked_offset(tp).await {
+                    Ok(latest_offset) => latest_offset,
+                    Err(e) => {
+                        error!("Failed to get latest tracked offset for Partition '{}': {}", tp, e);
+                        break;
+                    },
+                };
+
+                // Estimate new offset lag, considering the latest partition offset
+                curr_lag.offset_lag =
+                    po_reg.estimate_offset_lag(tp, curr_lag.offset).await.unwrap_or_else(|e| {
+                        debug!(
+                            "Failed to estimate Offset Lag of Group '{}' for Partition '{}': {}",
+                            g, tp, e
+                        );
+                        0
+                    });
+
+                // Estimate new time lag considering the time when the latest partition offset was produced
+                curr_lag.time_lag = po_reg.estimate_time_lag(tp, curr_lag.offset, latest_offset.at).await.unwrap_or_else(|e| {
+                    debug!(
+                            "Failed to estimate Time Lag of Group '{}' for Topic Partition '{}': {}",
+                           g, tp, e
+                        );
+                    Duration::zero()
+                });
+
+                // Store last time we updated this lag
+                curr_lag.timestamp = Utc::now();
+            }
+        }
+    }
+}
+
 async fn process_offset_commit(
     oc: OffsetCommit,
     lag_register_groups: Arc<RwLock<HashMap<String, GroupWithLag>>>,
@@ -239,6 +325,7 @@ async fn process_offset_commit(
             let l = Lag {
                 offset: oc.offset as u64,
                 offset_timestamp: oc.commit_timestamp,
+                timestamp: oc.commit_timestamp,
                 offset_lag: po_reg.estimate_offset_lag(&tp, oc.offset as u64)
                     .await
                     .unwrap_or_else(|e| {
