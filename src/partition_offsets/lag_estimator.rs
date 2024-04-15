@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 
 use super::errors::{PartitionOffsetsError, PartitionOffsetsResult};
 use super::tracked_offset::TrackedOffset;
@@ -319,20 +319,18 @@ fn interpolate_offset_to_datetime(
 ///
 /// * `utc_timestamp_ms` - Amount of milliseconds since UTC Epoch.
 fn utc_from_ms(utc_timestamp_ms: i64) -> PartitionOffsetsResult<DateTime<Utc>> {
-    Ok(DateTime::<Utc>::from_naive_utc_and_offset(
-        NaiveDateTime::from_timestamp_millis(utc_timestamp_ms)
-            .ok_or(PartitionOffsetsError::UtcTimestampMillisInvalid(utc_timestamp_ms))?,
-        Utc,
-    ))
+    DateTime::<Utc>::from_timestamp_millis(utc_timestamp_ms)
+        .ok_or(PartitionOffsetsError::UtcTimestampMillisInvalid(utc_timestamp_ms))
 }
 
 #[cfg(test)]
 mod test {
+    use chrono::Duration;
+
     use crate::partition_offsets::lag_estimator::{
         interpolate_offset_to_datetime, utc_from_ms, PartitionLagEstimator,
     };
     use crate::partition_offsets::tracked_offset::TrackedOffset;
-    use chrono::Duration;
 
     fn example_tracked_offsets() -> (Vec<u64>, Vec<i64>) {
         (
@@ -439,7 +437,7 @@ mod test {
         );
         assert_eq!(
             estimator.estimate_time_lag(1500, utc_from_ms(1677706438418).unwrap()),
-            Ok(Duration::nanoseconds(0))
+            Ok(Duration::zero())
         );
     }
 
