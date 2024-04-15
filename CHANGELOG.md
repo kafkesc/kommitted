@@ -14,6 +14,7 @@
 * Deps upgrade
 * `Dockerfile` base image updated
   to [`rust:1.77.2-slim-bookworm`](https://hub.docker.com/layers/library/rust/1.77.2-slim-bookworm/images/sha256-ed00d3908ba2ade42982456c2f9b8b6db5fecf14e9d1d2f58a1dedbb6a7c924e?context=explore)
+  ([PR#148](https://github.com/kafkesc/kommitted/pull/148))
 
 # v0.2.2 (2023-11-19)
 
