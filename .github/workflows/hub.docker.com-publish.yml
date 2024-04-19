@@ -1,12 +1,10 @@
 name: Publish Docker Image
 
 on:
-  # Enable the occasional manual trigger
-  workflow_dispatch:
 
   # This workflow is designed to be invoked by others, not triggered by events.
   workflow_call:
-    inputs:
+    inputs: &default_inputs
 
       target-platforms:
         type: string
@@ -28,7 +26,7 @@ on:
         type: string
         description: Version to publish as docker image (eg. 'vX.Y.Z')
 
-    secrets:
+    secrets: &default_secrets
 
       dockerhub-username:
         required: true
@@ -38,9 +36,16 @@ on:
         required: true
         description: Docker Hub password to use when publishing the image (e.g. the API token)
 
+  # Enable the occasional manual trigger
+  workflow_dispatch:
+    inputs:
+      <<: *default_inputs
+    secrets:
+      <<: *default_secrets
+
 jobs:
   build-and-push:
-    name: Build&Push ${{ inputs.dockerhub-org }}/${{ inputs.dockerhub-imagename }}:${{ inputs.release-version }} (${{ inputs.target-platforms })
+    name: Build&Push ${{ inputs.dockerhub-org }}/${{ inputs.dockerhub-imagename }}:${{ inputs.release-version }} (${{ inputs.target-platforms }})
 
     runs-on: ubuntu-latest
 
