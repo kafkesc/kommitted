@@ -4,44 +4,31 @@ on:
 
   # This workflow is designed to be invoked by others, not triggered by events.
   workflow_call:
-    inputs: &default_inputs
-
+    inputs:
       target-platforms:
         type: string
         default: linux/amd64,linux/arm64
         description: Platforms to target when publishing the docker image
-
       dockerhub-org:
         type: string
         default: kafkesc
         description: Docker Hub organization under which to publish the docker image
-
       dockerhub-imagename:
         type: string
         default: kommitted
         description: Name of the docker image to publish
-
       release-version:
         required: true
         type: string
         description: Version to publish as docker image (eg. 'vX.Y.Z')
 
-    secrets: &default_secrets
-
+    secrets:
       dockerhub-username:
         required: true
         description: Docker Hub username to use when publishing the image
-
       dockerhub-password:
         required: true
         description: Docker Hub password to use when publishing the image (e.g. the API token)
-
-  # Enable the occasional manual trigger
-  workflow_dispatch:
-    inputs:
-      <<: *default_inputs
-    secrets:
-      <<: *default_secrets
 
 jobs:
   build-and-push:

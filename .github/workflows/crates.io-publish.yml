@@ -40,15 +40,11 @@ jobs:
 
   publish-hub_docker_com:
     name: Publish to hub.docker.com
-
     needs:
       - publish-crates_io
-
     uses: ./.github/workflows/hub.docker.com-publish.yml
-
     with:
       release-version: ${{ github.ref_name }}
-
     secrets:
       dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
       dockerhub-password: ${{ secrets.DOCKERHUB_TOKEN }}
