@@ -1,3 +1,11 @@
+# v0.3.1 (2024-05-20)
+
+## Notes
+
+* Deps upgrade
+* Making latest `clippy` happy:
+  fixing [needless borrow](https://rust-lang.github.io/rust-clippy/master/index.html#needless_borrow).
+
 # v0.3.0 (2024-04-15)
 
 ## Bug Fixes

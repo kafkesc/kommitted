@@ -1,14 +1,13 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
-
 use konsumer_offsets::ConsumerProtocolAssignment;
 use prometheus::{
     register_histogram_with_registry, register_int_gauge_vec_with_registry,
     register_int_gauge_with_registry, Histogram, IntGauge, IntGaugeVec, Registry,
 };
 use rdkafka::{admin::AdminClient, client::DefaultClientContext, groups::GroupList, ClientConfig};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 use tokio::{
     sync::mpsc,
     task::JoinHandle,
@@ -39,7 +38,7 @@ const MET_CH_CAP_HELP: &str =
 
 /// A map of all the known Consumer Groups, at a given point in time.
 ///
-/// This reflects the internal state of Kafka and it's active Consumer Groups.
+/// This reflects the internal state of Kafka, and it's active Consumer Groups.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ConsumerGroups {
     pub(crate) groups: HashMap<String, GroupWithMembers>,
@@ -200,7 +199,7 @@ impl Emitter for ConsumerGroupsEmitter {
                         // Update group and group member metrics
                         metric_cg.set(cg.groups.len() as i64);
                         for (g, gm) in cg.groups.iter() {
-                            metric_cg_members.with_label_values(&[&g]).set(gm.members.len() as i64);
+                            metric_cg_members.with_label_values(&[g]).set(gm.members.len() as i64);
                         }
                         // Update channel capacity metric
                         metric_cg_ch_cap.set(sx.capacity() as i64);

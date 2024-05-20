@@ -1,6 +1,6 @@
 [package]
 name = "kommitted"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 authors = [
     "Ivan De Marino <detronizator@gmail.com>",
@@ -34,14 +34,14 @@ const_format = "0.2.32"
 ctrlc = { version = "3.4.4", features = ["termination"] }
 env_logger = "0.11.3"
 exit-code = "1.0.0"
-hyper = { version = "1.3.0", features = ["http1", "http2", "server"] }
-konsumer_offsets = { version = "0.3.0", default-features = false, features = ["ts_chrono"] }
+hyper = { version = "1.3.1", features = ["http1", "http2", "server"] }
+konsumer_offsets = { version = "0.3.2", default-features = false, features = ["ts_chrono"] }
 log = "0.4.21"
-prometheus = "0.13.3"
+prometheus = "0.13.4"
 regex = "1.10.4"
-thiserror = "1.0.58"
+thiserror = "1.0.61"
 tokio = { version = "1.37.0", features = ["rt", "rt-multi-thread", "time", "sync", "macros"] }
-tokio-util = "0.7.10"
+tokio-util = "0.7.11"
 tower-http = { version = "0.5", features = ["timeout"] }
 
 [target.'cfg(unix)'.dependencies]
