@@ -21,13 +21,13 @@ pub struct Cli {
     // ------------------------------------------------------------------ Admin Client configuration
     /// Initial Kafka Brokers to connect to (format: 'HOST:PORT,...').
     ///
-    /// Equivalent to '--config=bootstrap.servers:host:port,...'.
+    /// Equivalent to '--kafka-conf bootstrap.servers:host:port,...'.
     #[arg(short, long = "brokers", value_name = "BOOTSTRAP_BROKERS")]
     pub bootstrap_brokers: String,
 
     /// Client identifier used by the internal Kafka (Admin) Client.
     ///
-    /// Equivalent to '--config=client.id:my-client-id'.
+    /// Equivalent to '--kafka-conf client.id:my-client-id'.
     #[arg(long = "client-id", value_name = "CLIENT_ID", default_value = env!("CARGO_PKG_NAME"))]
     pub client_id: String,
 

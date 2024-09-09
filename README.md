@@ -105,12 +105,12 @@ each argument can do.
     -b, --brokers <BOOTSTRAP_BROKERS>
             Initial Kafka Brokers to connect to (format: 'HOST:PORT,...').
   
-            Equivalent to '--config=bootstrap.servers:host:port,...'.
+            Equivalent to '--kafka-conf bootstrap.servers:host:port,...'.
   
         --client-id <CLIENT_ID>
             Client identifier used by the internal Kafka (Admin) Client.
   
-            Equivalent to '--config=client.id:my-client-id'.
+            Equivalent to '--kafka-conf client.id:my-client-id'.
   
             [default: kommitted]
   
@@ -192,16 +192,16 @@ each argument can do.
 ```shell
 $ kommitted \
     --brokers {{ BOOTSTRAP_BROKERS or BROKER_ENDPOINT }} \
-    --config security.protocol:SASL_SSL \
-    --config sasl.mechanisms=PLAIN \
-    --config sasl.username:{{ USERNAME or API_KEY }} \
-    --config sasl.password:{{ PASSWORD or API_SECRET }} \  
+    --kafka-conf security.protocol:SASL_SSL \
+    --kafka-conf sasl.mechanisms=PLAIN \
+    --kafka-conf sasl.username:{{ USERNAME or API_KEY }} \
+    --kafka-conf sasl.password:{{ PASSWORD or API_SECRET }} \
     ...
 ```
 
 ### Log verbosity
 
-Kommitted follows the long tradition of `-v/-q` to control the verbosity of it's logging:
+Kommitted follows the long tradition of `-v/-q` to control the verbosity of its logging:
 
 | Arguments | Log verbosity level | Default |
 |----------:|:--------------------|:-------:|
